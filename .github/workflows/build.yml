@@ -4,55 +4,6 @@ on:
   pull_request:
 
 jobs:
-  cross-build:
-    strategy:
-      matrix:
-        go-version: ["1.24.4"]
-        os:
-          #- ubuntu-latest
-          #- macos-latest
-          # - windows-latest # Windows seems to have some issues with the Zig installation
-    runs-on: ${{ matrix.os }}
-    env:
-      # Our script only installs the dependencies automatically if it's running inside Docker.
-      # GitHub Actions is not running inside Docker, so we need to set this environment variable
-      # to allow the automatic installation of the dependencies.
-      ALLOW_OUTSIDE_DOCKER: "1"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Make shell scripts executable
-        run: find . -name "*.sh" -type f -exec chmod +x {} \;
-      - name: Set up Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: ${{ matrix.go-version }}
-          cache: true
-          cache-dependency-path: go.sum
-      - name: Set up Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.14.1
-          use-cache: true
-      - name: Build
-        run: |
-          go mod vendor
-          make all
-      # check if the binary is working
-      - name: Test
-        run: |
-          case ${{ matrix.os }} in
-            ubuntu-latest)
-              ./dist/linuxgnu-amd64/demo --database-url=sqlite://./test.sqlite3
-              ./dist/linuxmusl-amd64/demo --database-url=sqlite://./test.sqlite3
-              ;;
-            macos-latest)
-              ./dist/darwin/demo --database-url=sqlite://./test.sqlite3
-              ;;
-            windows-latest)
-              ./dist/windows-amd64/demo --database-url=sqlite://./test.sqlite3
-              ;;
-          esac
-
   cross-build-in-docker:
     runs-on: ubuntu-latest
     container:
