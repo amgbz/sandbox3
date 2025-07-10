@@ -48,37 +48,47 @@ jobs:
             goarch: amd64
             ldflags: "-w -s -H windowsgui"
             binname: windows-amd64.exe
-          - os: ubuntu-24.04-arm
-            goos: linux
+          - os: macos-latest
+            goos: darwin
             goarch: arm64
             ldflags: "-w -s"
-            binname: linux-arm64.out
-            apt_dependencies: |
-              libx11-dev
-              libxcb1-dev
-              libxkbcommon-dev
-              libxkbcommon-x11-dev
-              libwayland-dev
-              libxcursor-dev
-              libxfixes-dev
-              libegl1-mesa-dev
-              libx11-xcb-dev
-              libvulkan-dev
-          - os: windows-11-arm
+            binname: macos-arm64.osx
+          - os: windows-latest
             goos: windows
             goarch: arm64
             ldflags: "-w -s -H windowsgui"
             binname: windows-arm64.exe
           - os: macos-latest
             goos: darwin
-            goarch: arm64
-            ldflags: "-w -s"
-            binname: macos-arm64.osx
-          - os: macos-13
-            goos: darwin
             goarch: amd64
             ldflags: "-w -s"
             binname: macos-amd64.osx
+          # - os: ubuntu-24.04-arm
+          #   goos: linux
+          #   goarch: arm64
+          #   ldflags: "-w -s"
+          #   binname: linux-arm64.out
+          #   apt_dependencies: |
+          #     libx11-dev
+          #     libxcb1-dev
+          #     libxkbcommon-dev
+          #     libxkbcommon-x11-dev
+          #     libwayland-dev
+          #     libxcursor-dev
+          #     libxfixes-dev
+          #     libegl1-mesa-dev
+          #     libx11-xcb-dev
+          #     libvulkan-dev
+          # - os: windows-11-arm
+          #   goos: windows
+          #   goarch: arm64
+          #   ldflags: "-w -s -H windowsgui"
+          #   binname: windows-arm64.exe
+          # - os: macos-13
+          #   goos: darwin
+          #   goarch: amd64
+          #   ldflags: "-w -s"
+          #   binname: macos-amd64.osx
 
     runs-on: ${{ matrix.os }}
 
