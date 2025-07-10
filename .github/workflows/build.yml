@@ -20,6 +20,8 @@ jobs:
       ALLOW_OUTSIDE_DOCKER: "1"
     steps:
       - uses: actions/checkout@v4
+      - name: Make shell scripts executable
+        run: find . -name "*.sh" -type f -exec chmod +x {} \;
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
@@ -57,6 +59,8 @@ jobs:
       GOFLAGS: "-buildvcs=false"
     steps:
       - uses: actions/checkout@v4
+      - name: Make shell scripts executable
+        run: find . -name "*.sh" -type f -exec chmod +x {} \;
       - name: Build
         run: |
           go mod vendor
