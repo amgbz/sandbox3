@@ -141,7 +141,7 @@ jobs:
         # Download dependencies
         go mod download
         go mod verify
-        if [ ${{ matrix.goarch }} == "arm64" && ${{ matrix.goos }} == "linux" ]; then
+        if [[ ${{ matrix.goarch }} == "arm64" && ${{ matrix.goos }} == "linux" ]]; then
           sudo apt-get install -yq gcc-aarch64-linux-gnu
           export CC=aarch64-linux-gnu-gcc
           #export CGO_CFLAGS="-target=aarch64-linux-gnu"
