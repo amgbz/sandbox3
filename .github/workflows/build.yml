@@ -43,6 +43,22 @@ jobs:
               libegl1-mesa-dev
               libx11-xcb-dev
               libvulkan-dev
+          - os: ubuntu-latest
+            goos: linux
+            goarch: arm64
+            ldflags: "-w -s"
+            binname: linux-arm64.out
+            apt_dependencies: |
+              libx11-dev
+              libxcb1-dev
+              libxkbcommon-dev
+              libxkbcommon-x11-dev
+              libwayland-dev
+              libxcursor-dev
+              libxfixes-dev
+              libegl1-mesa-dev
+              libx11-xcb-dev
+              libvulkan-dev
           - os: windows-latest
             goos: windows
             goarch: amd64
@@ -99,6 +115,7 @@ jobs:
       env:
         DEBIAN_FRONTEND: noninteractive
       run: |
+        set -x
         sudo apt-get -q update
         echo "Installing apt dependencies: ${{ matrix.apt_dependencies }}"
         echo "${{ matrix.apt_dependencies }}" | xargs sudo apt-get -yq install 
@@ -119,6 +136,7 @@ jobs:
         GOARCH: ${{ matrix.goarch }}
         CGO_ENABLED: 1
       run: |
+        set -x
         go env
         # Download dependencies
         go mod download
