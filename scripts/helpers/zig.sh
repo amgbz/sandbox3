@@ -37,7 +37,7 @@ if [ ! -x "${ZIG_DIR}/zig" ]; then
     if echo "${ZIG_VERSION}" | grep -q 'dev'; then
         ZIG_DOWNLOAD_URL="https://ziglang.org/builds/zig-linux-${ARCH}-${ZIG_VERSION}.tar.xz"
     else
-        ZIG_DOWNLOAD_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-linux-${ARCH}-${ZIG_VERSION}.tar.xz"
+        ZIG_DOWNLOAD_URL="https://ziglang.org/download/${ZIG_VERSION}/zig-${ARCH}-linux-${ZIG_VERSION}.tar.xz"
     fi
     DOWNLOAD_FILE="/tmp/zig.tar.xz"
 
