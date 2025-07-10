@@ -59,7 +59,7 @@ jobs:
   cross-build-in-docker:
     runs-on: ubuntu-latest
     container:
-      image: golang:${{ matrix.go-version }}
+      image: golang:1.24.4
     env:
       # Disable the build version control system to avoid issues with Containers on GitHub Actions
       GOFLAGS: "-buildvcs=false"
