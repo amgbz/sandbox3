@@ -30,7 +30,7 @@ ZIG_DIR="${ZIG_DIR:-${HOME}/.zig}"
 
 if [ ! -x "${ZIG_DIR}/zig" ]; then
     # https://github.com/ziglang/zig/issues/20243
-    ZIG_VERSION="${ZIG_VERSION:-0.14.0-dev.2265+8a00bd4ce}"
+    ZIG_VERSION="${ZIG_VERSION:-0.14.1}"
 
     ARCH=$(uname -m)
     # is development version (contains 'dev')?
