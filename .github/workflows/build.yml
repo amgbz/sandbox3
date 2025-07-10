@@ -27,9 +27,9 @@ jobs:
         with:
           go-version: ${{ matrix.go-version }}
       - name: Set up Zig
-        uses: mlugg/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.0-dev.2265+8a00bd4ce
+          version: 0.14.1
       - name: Build
         run: |
           go mod vendor
