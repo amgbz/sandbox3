@@ -71,14 +71,14 @@ jobs:
             binname: windows-arm64.exe
           - os: macos-latest
             goos: darwin
-            goarch: amd64
-            ldflags: "-w -s"
-            binname: macos-amd64.osx
-          - os: macos-latest-large
-            goos: darwin
             goarch: arm64
             ldflags: "-w -s"
             binname: macos-arm64.osx
+          - os: macos-13
+            goos: darwin
+            goarch: amd64
+            ldflags: "-w -s"
+            binname: macos-amd64.osx
 
     runs-on: ${{ matrix.os }}
 
