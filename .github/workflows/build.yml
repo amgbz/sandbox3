@@ -1,197 +1,73 @@
-name: Cross-Platform Build
-
+name: Build
 on:
   push:
-    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
-  workflow_call:
-  workflow_dispatch:
-
-env:
-  BRANCH_NAME: ${{ github.head_ref || github.ref_name }} 
-  COMPARISON_BRANCH: ${{ github.base_ref || 'dev' }}
-  GOFLAGS: '-buildvcs=false -mod=readonly'
-
-permissions:
-  contents: write
-  packages: read
-
-defaults:
-  run:
-    shell: bash
 
 jobs:
-  build:
-    name: Build for ${{ matrix.goos }} ${{ matrix.goarch }}
+  cross-build:
     strategy:
       matrix:
-        include:
-          - os: ubuntu-latest
-            goos: linux
-            goarch: amd64
-            ldflags: "-w -s"
-            binname: linux-amd64.out
-            apt_dependencies: |
-              libx11-dev
-              libxcb1-dev
-              libxkbcommon-dev
-              libxkbcommon-x11-dev
-              libwayland-dev
-              libxcursor-dev
-              libxfixes-dev
-              libegl1-mesa-dev
-              libx11-xcb-dev
-              libvulkan-dev
-          - os: ubuntu-latest
-            goos: linux
-            goarch: arm64
-            ldflags: "-w -s"
-            binname: linux-arm64.out
-            apt_dependencies: |
-              libx11-dev
-              libxcb1-dev
-              libxkbcommon-dev
-              libxkbcommon-x11-dev
-              libwayland-dev
-              libxcursor-dev
-              libxfixes-dev
-              libegl1-mesa-dev
-              libx11-xcb-dev
-              libvulkan-dev
-          - os: windows-latest
-            goos: windows
-            goarch: amd64
-            ldflags: "-w -s -H windowsgui"
-            binname: windows-amd64.exe
-          - os: macos-latest
-            goos: darwin
-            goarch: arm64
-            ldflags: "-w -s"
-            binname: macos-arm64.osx
-          - os: windows-latest
-            goos: windows
-            goarch: arm64
-            ldflags: "-w -s -H windowsgui"
-            binname: windows-arm64.exe
-          - os: macos-latest
-            goos: darwin
-            goarch: amd64
-            ldflags: "-w -s"
-            binname: macos-amd64.osx
-          # - os: ubuntu-24.04-arm
-          #   goos: linux
-          #   goarch: arm64
-          #   ldflags: "-w -s"
-          #   binname: linux-arm64.out
-          #   apt_dependencies: |
-          #     libx11-dev
-          #     libxcb1-dev
-          #     libxkbcommon-dev
-          #     libxkbcommon-x11-dev
-          #     libwayland-dev
-          #     libxcursor-dev
-          #     libxfixes-dev
-          #     libegl1-mesa-dev
-          #     libx11-xcb-dev
-          #     libvulkan-dev
-          # - os: windows-11-arm
-          #   goos: windows
-          #   goarch: arm64
-          #   ldflags: "-w -s -H windowsgui"
-          #   binname: windows-arm64.exe
-          # - os: macos-13
-          #   goos: darwin
-          #   goarch: amd64
-          #   ldflags: "-w -s"
-          #   binname: macos-amd64.osx
-
+        go-version: ["1.23.3"]
+        os:
+          - ubuntu-latest
+          - macos-latest
+          # - windows-latest # Windows seems to have some issues with the Zig installation
     runs-on: ${{ matrix.os }}
-
+    env:
+      # Our script only installs the dependencies automatically if it's running inside Docker.
+      # GitHub Actions is not running inside Docker, so we need to set this environment variable
+      # to allow the automatic installation of the dependencies.
+      ALLOW_OUTSIDE_DOCKER: "1"
     steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v1
+        with:
+          version: 0.14.0-dev.2265+8a00bd4ce
+      - name: Build
+        run: |
+          go mod vendor
+          make all
+      # check if the binary is working
+      - name: Test
+        run: |
+          case ${{ matrix.os }} in
+            ubuntu-latest)
+              ./dist/linuxgnu-amd64/demo --database-url=sqlite://./test.sqlite3
+              ./dist/linuxmusl-amd64/demo --database-url=sqlite://./test.sqlite3
+              ;;
+            macos-latest)
+              ./dist/darwin/demo --database-url=sqlite://./test.sqlite3
+              ;;
+            windows-latest)
+              ./dist/windows-amd64/demo --database-url=sqlite://./test.sqlite3
+              ;;
+          esac
 
-    - name: Install Linux dependencies
-      if: matrix.goos == 'linux'
-      env:
-        DEBIAN_FRONTEND: noninteractive
-      run: |
-        set -x
-        sudo apt-get -q update
-        if [[ ${{ matrix.goarch }} == "arm64" ]]; then
-          # For ARM64 cross-compilation, use ports.ubuntu.com for ARM64 packages
-          echo "Setting up ARM64 cross-compilation"
-          sudo apt-get -yq install gcc-aarch64-linux-gnu
-          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          
-          # Add ARM64 architecture and configure sources for ports.ubuntu.com
-          sudo dpkg --add-architecture arm64
-          
-          # Backup original sources and add ARM64 sources
-          sudo cp /etc/apt/sources.list /etc/apt/sources.list.bak
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs) main universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-updates main universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-backports main universe" | sudo tee -a /etc/apt/sources.list
-          echo "deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports/ $(lsb_release -cs)-security main universe" | sudo tee -a /etc/apt/sources.list
-          
-          # Update package lists
-          sudo apt-get -q update
-          
-          # Install ARM64 cross-compilation libraries
-          echo "Installing ARM64 cross-compilation dependencies"
-          sudo apt-get -yq install \
-            libx11-dev:arm64 \
-            libxcb1-dev:arm64 \
-            libxkbcommon-dev:arm64 \
-            libxkbcommon-x11-dev:arm64 \
-            libwayland-dev:arm64 \
-            libxcursor-dev:arm64 \
-            libxfixes-dev:arm64 \
-            libegl1-mesa-dev:arm64 \
-            libx11-xcb-dev:arm64 \
-            libvulkan-dev:arm64
-        else
-          # Install native dependencies for AMD64
-          echo "Installing apt dependencies: ${{ matrix.apt_dependencies }}"
-          echo "${{ matrix.apt_dependencies }}" | xargs sudo apt-get -yq install
-        fi 
-
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Set up Go
-      uses: actions/setup-go@v5
-      with:
-        cache: true
-        cache-dependency-path: go.sum
-        go-version-file: go.mod
-
-    - name: Build application
-      env:
-        GOOS: ${{ matrix.goos }}
-        GOARCH: ${{ matrix.goarch }}
-        CGO_ENABLED: 1
-      run: |
-        set -x
-        go env
-        # Download dependencies
-        go mod download
-        go mod verify
-        if [[ ${{ matrix.goarch }} == "arm64" && ${{ matrix.goos }} == "linux" ]]; then
-          #export CC=aarch64-linux-gnu-gcc
-          rnv | grep CC
-          export PKG_CONFIG_PATH=/usr/lib/aarch64-linux-gnu/pkgconfig
-          echo "Building ARM64 with CGO enabled using cross-compiler"
-        fi
-        go build -ldflags="${{ matrix.ldflags }}" -o ${{ matrix.binname }} .
-        mkdir -p artifacts-${{ matrix.goos }}-${{ matrix.goarch }}
-        mv ${{ matrix.binname }} artifacts-${{ matrix.goos }}-${{ matrix.goarch }}
-        cd artifacts-${{ matrix.goos }}-${{ matrix.goarch }}
-        7z a -t7z -mx=9 -ms=on ../artifacts-${{ matrix.goos }}-${{ matrix.goarch }}.7z *
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      with:
-        name: projectname-${{ matrix.binname }}
-        path: artifacts-${{ matrix.goos }}-${{ matrix.goarch }}.7z
-        compression-level: 0
-        retention-days: 1
+  cross-build-in-docker:
+    runs-on: ubuntu-latest
+    container:
+      image: golang:1.23.3
+    env:
+      # Disable the build version control system to avoid issues with Containers on GitHub Actions
+      GOFLAGS: "-buildvcs=false"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          go mod vendor
+          make all
+      - name: Test
+        run: |
+          ./dist/linuxgnu-amd64/demo --database-url=sqlite://./test.sqlite3
+          ./dist/linuxmusl-amd64/demo --database-url=sqlite://./test.sqlite3
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          path: dist
+          compression-level: 0
+          retention-days: 1
