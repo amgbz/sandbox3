@@ -12,6 +12,24 @@ COMMON_GOFLAGS := -tags 'sqlite_json,sqlite_foreign_keys,sqlite_fts5'
 LINUXGNU_GOFLAGS := --ldflags '-linkmode external -w' $(COMMON_GOFLAGS)
 LINUXGNU_GLIBC_VERSION := 2.17
 
+LINUXGNU_ZIG_FLAGS_AMD64 = \
+	-I/usr/include \
+	-I/usr/include/x86_64-linux-gnu \
+	-L/usr/lib/x86_64-linux-gnu
+
+LINUXGNU_ZIG_FLAGS_ARM64 = \
+	-I/usr/include \
+	-I/usr/include/aarch64-linux-gnu \
+	-L/usr/lib/aarch64-linux-gnu
+
+LINUXMUSL_ZIG_FLAGS_AMD64 = \
+	-I/usr/include \
+	-I/usr/include/x86_64-linux-gnu
+
+LINUXMUSL_ZIG_FLAGS_ARM64 = \
+	-I/usr/include \
+	-I/usr/include/aarch64-linux-gnu
+
 LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' $(COMMON_GOFLAGS)
 
 DARWIN_GOFLAGS = --ldflags '-linkmode external -w' $(COMMON_GOFLAGS)
@@ -40,32 +58,32 @@ linuxgnu: dist/linuxgnu-amd64/demo dist/linuxgnu-arm64/demo
 linuxmusl: dist/linuxmusl-amd64/demo dist/linuxmusl-arm64/demo
 
 dist/linuxgnu-amd64/demo: $(SOURCES)
-	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-gnu.$(LINUXGNU_GLIBC_VERSION))
-	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-gnu.$(LINUXGNU_GLIBC_VERSION))
+	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-gnu.$(LINUXGNU_GLIBC_VERSION) $(LINUXGNU_ZIG_FLAGS_AMD64))
+	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-gnu.$(LINUXGNU_GLIBC_VERSION) $(LINUXGNU_ZIG_FLAGS_AMD64))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = amd64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
 	go build $(LINUXGNU_GOFLAGS) -o $@ $(MAIN_PACKAGE_PATH)
 
 dist/linuxgnu-arm64/demo: $(SOURCES)
-	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-gnu.$(LINUXGNU_GLIBC_VERSION))
-	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-gnu.$(LINUXGNU_GLIBC_VERSION))
+	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-gnu.$(LINUXGNU_GLIBC_VERSION) $(LINUXGNU_ZIG_FLAGS_ARM64))
+	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-gnu.$(LINUXGNU_GLIBC_VERSION) $(LINUXGNU_ZIG_FLAGS_ARM64))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = arm64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
 	go build $(LINUXGNU_GOFLAGS) -o $@ $(MAIN_PACKAGE_PATH)
 
 dist/linuxmusl-amd64/demo: $(SOURCES)
-	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-musl)
-	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-musl)
+	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
+	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = amd64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
 	go build $(LINUXMUSL_GOFLAGS) -o $@ $(MAIN_PACKAGE_PATH)
 
 dist/linuxmusl-arm64/demo: $(SOURCES)
-	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-musl)
-	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-musl)
+	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
+	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = arm64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
