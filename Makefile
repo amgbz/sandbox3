@@ -102,16 +102,16 @@ dist/linuxgnu-arm64/demo: $(SOURCES)
 	go build $(LINUXGNU_GOFLAGS) -o $@ $(MAIN_PACKAGE_PATH)
 
 dist/linuxmusl-amd64/demo: $(SOURCES)
-	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-musl --libc=musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
-	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-musl --libc=musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
+	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
+	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = amd64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
 	go build $(LINUXMUSL_GOFLAGS) -o $@ $(MAIN_PACKAGE_PATH)
 
 dist/linuxmusl-arm64/demo: $(SOURCES)
-	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-musl --libc=musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
-	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-musl --libc=musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
+	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
+	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = arm64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
