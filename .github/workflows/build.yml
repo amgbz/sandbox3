@@ -362,6 +362,133 @@ jobs:
           kill $XVFB_PID 2>/dev/null || true
           
           echo "GUI test completed"
+      - name: Test Windows GUI Application with Wine
+        continue-on-error: true
+        run: |
+          set -x
+          
+          # Install Wine
+          echo "Installing Wine..."
+          dpkg --add-architecture i386
+          apt-get update -yq
+          apt-get install -yq wine wine32 wine64 xvfb
+          
+          # Set up Wine environment
+          export WINEARCH=win64
+          export WINEPREFIX=/tmp/wine-prefix
+          export DISPLAY=:98
+          
+          # Initialize Wine (suppress output)
+          echo "Initializing Wine..."
+          wine --version
+          wineboot --init 2>/dev/null || true
+          
+          # Set up X11 environment for Wine
+          export XDG_SESSION_TYPE=x11
+          export XDG_RUNTIME_DIR=/tmp/runtime-wine
+          export WAYLAND_DISPLAY=""
+          export QT_QPA_PLATFORM=xcb
+          export GDK_BACKEND=x11
+          mkdir -p $XDG_RUNTIME_DIR
+          chmod 700 $XDG_RUNTIME_DIR
+          
+          # Start separate Xvfb for Wine test
+          Xvfb :98 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &
+          XVFB_WINE_PID=$!
+          
+          # Wait for X server to start
+          sleep 3
+          
+          # Verify X server is running
+          echo "Checking Wine X server..."
+          xdpyinfo -display :98 | head -n 20 || echo "Wine X server check failed"
+          
+          # Start lightweight window manager for Wine
+          fluxbox -display :98 2>/dev/null &
+          FLUXBOX_WINE_PID=$!
+          
+          # Wait for window manager
+          sleep 3
+          
+          # Test the Windows GUI application with Wine
+          echo "Testing Windows amd64 GUI application with Wine..."
+          echo "Environment variables:"
+          env | grep -E "(DISPLAY|XDG|WAYLAND|QT|GDK|WINE)" | sort
+          
+          # Run the Windows application with Wine in background
+          echo "Starting Windows application with Wine..."
+          if [ -f "./dist/windows-amd64/demo.exe" ]; then
+            timeout 30s wine ./dist/windows-amd64/demo.exe &
+            WINE_APP_PID=$!
+            echo "Wine application PID: $WINE_APP_PID"
+            
+            # Wait for the app to start
+            sleep 5
+            
+            # Check if Wine application is still running
+            if ps -p $WINE_APP_PID > /dev/null; then
+              echo "Wine application is running"
+            else
+              echo "Wine application may have exited early"
+            fi
+            
+            # Wait more for the app to render
+            sleep 5
+            
+            # Take screenshot of Wine application
+            echo "Taking Wine screenshot..."
+            import -window root -display :98 screenshot-wine-amd64.png 2>/dev/null || echo "Wine screenshot failed"
+            
+            # Check if screenshot was created
+            if [ -f "screenshot-wine-amd64.png" ] && [ -s "screenshot-wine-amd64.png" ]; then
+              echo "Wine screenshot captured successfully"
+              ls -la screenshot-wine-amd64.png
+              
+              # Create 2x scaled version for better OCR
+              echo "Creating 2x scaled image for OCR..."
+              convert screenshot-wine-amd64.png -resize 200% screenshot-wine-amd64-2x.png 2>/dev/null || echo "2x scaling failed"
+              
+              # Perform OCR on 2x scaled image
+              echo "Performing OCR on 2x scaled Wine screenshot..."
+              if tesseract screenshot-wine-amd64-2x.png wine-ocr-2x -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\ .,:-! 2>/dev/null; then
+                if [ -f "wine-ocr-2x.txt" ] && [ -s "wine-ocr-2x.txt" ]; then
+                  echo "Wine OCR (2x scaled) - SUCCESS:"
+                  cat wine-ocr-2x.txt
+                else
+                  echo "Wine OCR (2x scaled) created empty file"
+                fi
+              else
+                echo "Wine OCR (2x scaled) failed"
+              fi
+              
+              # Generate simple ASCII art with chafa
+              echo "Generating simple ASCII art from Wine screenshot..."
+              if chafa screenshot-wine-amd64.png -s 80x60 -c 2 > wine-ascii-simple.txt 2>&1; then
+                if [ -s wine-ascii-simple.txt ]; then
+                  echo "Wine ASCII art - SUCCESS:"
+                  cat wine-ascii-simple.txt
+                else
+                  echo "Wine ASCII art created empty file"
+                fi
+              else
+                echo "Wine ASCII art generation failed"
+              fi
+            else
+              echo "Wine screenshot was not captured or is empty"
+            fi
+            
+            # Kill the Wine application
+            kill $WINE_APP_PID 2>/dev/null || true
+            wait $WINE_APP_PID 2>/dev/null || true
+          else
+            echo "Windows executable not found: ./dist/windows-amd64/demo.exe"
+          fi
+          
+          # Clean up Wine processes
+          kill $FLUXBOX_WINE_PID 2>/dev/null || true
+          kill $XVFB_WINE_PID 2>/dev/null || true
+          
+          echo "Wine GUI test completed"
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -378,5 +505,7 @@ jobs:
             screenshot*.png
             ocr*.txt
             ascii*.txt
+            wine-*.txt
+            wine-*.png
             *.xwd
           retention-days: 1
