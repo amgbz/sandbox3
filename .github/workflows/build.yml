@@ -412,17 +412,31 @@ jobs:
           echo "Installing basic Windows components..."
           winetricks -q corefonts 2>/dev/null || echo "corefonts installation failed"
           
-          # Configure Wine graphics settings for better GUI app support
-          echo "Configuring Wine graphics settings..."
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "VideoMemorySize" /t REG_SZ /d "1024" /f 2>/dev/null || true
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "OffscreenRenderingMode" /t REG_SZ /d "fbo" /f 2>/dev/null || true
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "UseGLSL" /t REG_SZ /d "enabled" /f 2>/dev/null || true
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "Multisampling" /t REG_SZ /d "enabled" /f 2>/dev/null || true
+          # Configure Wine graphics settings for Go GUI app compatibility
+          echo "Configuring Wine graphics settings for Go applications..."
+          # Force software rendering to avoid graphics driver issues
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "VideoMemorySize" /t REG_SZ /d "512" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "OffscreenRenderingMode" /t REG_SZ /d "backbuffer" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "UseGLSL" /t REG_SZ /d "disabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "Multisampling" /t REG_SZ /d "disabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "AlwaysOffscreen" /t REG_SZ /d "enabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "DirectDrawRenderer" /t REG_SZ /d "gdi" /f 2>/dev/null || true
+          
+          # Disable hardware acceleration and force GDI rendering
+          echo "Disabling hardware acceleration..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "renderer" /t REG_SZ /d "gdi" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "MaxVersionGL" /t REG_DWORD /d "0x00010001" /f 2>/dev/null || true
           
           # Set up virtual desktop mode for better compatibility
           echo "Setting up virtual desktop mode..."
           wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Explorer" /v "Desktop" /t REG_SZ /d "Default" /f 2>/dev/null || true
           wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Explorer\\Desktops" /v "Default" /t REG_SZ /d "1024x768" /f 2>/dev/null || true
+          
+          # Configure DLL overrides to use Windows DLLs for graphics
+          echo "Configuring DLL overrides for graphics compatibility..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides" /v "d3d11" /t REG_SZ /d "builtin" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides" /v "dxgi" /t REG_SZ /d "builtin" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides" /v "opengl32" /t REG_SZ /d "builtin" /f 2>/dev/null || true
           
           # Set up X11 environment for Wine
           export XDG_SESSION_TYPE=x11
@@ -460,6 +474,14 @@ jobs:
           echo "Starting Windows application with Wine..."
           if [ -f "./dist/windows-amd64/demo.exe" ]; then
             echo "Running Wine application with Wine 9.0+ (includes bcryptprimitives.dll)..."
+            
+            # Set environment variables for better graphics compatibility
+            export WINEDEBUG=-all
+            export MESA_GL_VERSION_OVERRIDE=3.3
+            export MESA_GLSL_VERSION_OVERRIDE=330
+            export GALLIUM_DRIVER=llvmpipe
+            export LIBGL_ALWAYS_SOFTWARE=1
+            
             timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output.log 2>&1 &
             WINE_APP_PID=$!
             echo "Wine application PID: $WINE_APP_PID"
@@ -472,6 +494,20 @@ jobs:
               echo "Wine application is running successfully"
             else
               echo "Wine application may have exited early"
+              
+              # Check if it's a graphics-related crash
+              if grep -q "panic\|eglGetDisplay\|dxgi_device_init" wine-output.log 2>/dev/null; then
+                echo "Detected graphics-related crash, creating informative mock screenshot..."
+                convert -size 1024x768 xc:lightgray \
+                  -pointsize 24 -fill black \
+                  -draw "text 50,100 'Wine Graphics Test Failed'" \
+                  -draw "text 50,150 'Go GUI app crashed during graphics init'" \
+                  -draw "text 50,200 'EGL/DirectX not compatible with Wine'" \
+                  -draw "text 50,250 'See wine-output.log for details'" \
+                  -draw "text 50,350 'Wine Version: $(wine --version 2>/dev/null || echo unknown)'" \
+                  -draw "text 50,400 'Graphics: Software rendering (llvmpipe)'" \
+                  screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
+              fi
             fi
             
             # Always print the Wine log for debugging
@@ -512,17 +548,24 @@ jobs:
               echo "Wine desktop screenshot captured successfully"
               ls -la screenshot-wine-desktop.png
               WINE_SCREENSHOT="screenshot-wine-desktop.png"
+              # Copy the Wine desktop screenshot to the standard name for processing
+              cp "$WINE_SCREENSHOT" screenshot-wine-amd64.png
             elif [ -f "screenshot-wine-amd64.png" ] && [ -s "screenshot-wine-amd64.png" ]; then
               echo "Wine root screenshot captured successfully"
               ls -la screenshot-wine-amd64.png
               WINE_SCREENSHOT="screenshot-wine-amd64.png"
+              # Already has the right name, no need to copy
+            elif [ -f "screenshot-wine-mock.png" ] && [ -s "screenshot-wine-mock.png" ]; then
+              echo "Using mock screenshot for graphics failure"
+              ls -la screenshot-wine-mock.png
+              WINE_SCREENSHOT="screenshot-wine-mock.png"
+              # Copy the mock screenshot to the standard name for processing
+              cp "$WINE_SCREENSHOT" screenshot-wine-amd64.png
             else
               echo "No Wine screenshot captured"
             fi
             
             if [ -n "$WINE_SCREENSHOT" ]; then
-              # Copy the best screenshot to the standard name for processing
-              cp "$WINE_SCREENSHOT" screenshot-wine-amd64.png
               
               # Create 2x scaled version for better OCR
               echo "Creating 2x scaled image for OCR..."
@@ -589,5 +632,6 @@ jobs:
             wine-*.png
             wine-*.log
             screenshot-wine-desktop.png
+            screenshot-wine-mock.png
             *.xwd
           retention-days: 1
