@@ -379,14 +379,25 @@ jobs:
           apt-get update -yq
           
           # Install Wine development version (10.9+ with improved EGL support) from WineHQ
-          # Try installing wine-devel directly first, then winehq-devel
-          apt-get install -yq wine-devel xvfb curl || {
-            echo "Direct wine-devel installation failed, trying winehq-devel without recommends..."
-            apt-get install -yq winehq-devel xvfb curl || {
-              echo "winehq-devel installation failed, falling back to winehq-staging..."
-              apt-get install -yq winehq-staging xvfb curl || {
-                echo "All Wine devel versions failed, falling back to stable..."
-                apt-get install -yq winehq-stable xvfb curl
+          echo "Attempting to install Wine development version..."
+          
+          # Update package cache and fix any broken dependencies first
+          apt-get update -yq
+          apt-get install -yq -f
+          
+          # Try to force install winehq-devel with dependency resolution
+          echo "Installing winehq-devel with dependency resolution..."
+          apt-get install -yq --fix-missing --install-recommends winehq-devel xvfb curl || {
+            echo "Trying winehq-devel without install-recommends..."
+            apt-get install -yq --fix-missing winehq-devel xvfb curl || {
+              echo "Trying to fix broken packages and install again..."
+              apt-get install -yq -f
+              apt-get install -yq winehq-devel xvfb curl || {
+                echo "Final attempt: trying winehq-staging..."
+                apt-get install -yq winehq-staging xvfb curl || {
+                  echo "ERROR: Failed to install any Wine development version!"
+                  exit 1
+                }
               }
             }
           }
