@@ -404,6 +404,9 @@ jobs:
               }
             }
           }
+      - name: Verify Wine
+        run: |
+          set -x
           
           # Verify Wine installation
           echo "========================================="
@@ -440,8 +443,8 @@ jobs:
           
           # Install minimal Windows components
           echo "Installing basic Windows components..."
-          winetricks -q corefonts 2>/dev/null || echo "corefonts installation failed"
-          
+          winetricks -q corefonts
+
           # Configure Wine graphics settings for Go GUI app compatibility
           echo "Configuring Wine graphics settings for Go applications..."
           # Force software rendering to avoid graphics driver issues
@@ -558,13 +561,7 @@ jobs:
               fi
             fi
             
-            # Always print the Wine log for debugging
-            echo ""
-            echo "=== WINE OUTPUT LOG ==="
-            cat wine-output.log 2>/dev/null || echo "No wine output log"
-            echo "=== END WINE OUTPUT LOG ==="
-            echo ""
-            
+
             # Wait more for the app to render
             sleep 5
             
@@ -658,7 +655,13 @@ jobs:
           # Clean up Wine processes
           kill $FLUXBOX_WINE_PID 2>/dev/null || true
           kill $XVFB_WINE_PID 2>/dev/null || true
-          
+          # Always print the Wine log for debugging
+          echo ""
+          echo "=== WINE OUTPUT LOG ==="
+          cat wine-output.log 2>/dev/null || echo "No wine output log"
+          echo "=== END WINE OUTPUT LOG ==="
+          echo ""
+            
           echo "Wine GUI test completed"
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
