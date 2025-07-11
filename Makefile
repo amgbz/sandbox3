@@ -13,22 +13,26 @@ LINUXGNU_GOFLAGS := --ldflags '-linkmode external -w' $(COMMON_GOFLAGS)
 LINUXGNU_GLIBC_VERSION := 2.17
 
 LINUXGNU_ZIG_FLAGS_AMD64 = \
-	-I/usr/include \
 	-I/usr/include/x86_64-linux-gnu \
-	-L/usr/lib/x86_64-linux-gnu
+	-I/usr/include \
+	-L/usr/lib/x86_64-linux-gnu \
+	-D_GNU_SOURCE
 
 LINUXGNU_ZIG_FLAGS_ARM64 = \
-	-I/usr/include \
 	-I/usr/include/aarch64-linux-gnu \
-	-L/usr/lib/aarch64-linux-gnu
+	-I/usr/include \
+	-L/usr/lib/aarch64-linux-gnu \
+	-D_GNU_SOURCE
 
 LINUXMUSL_ZIG_FLAGS_AMD64 = \
+	-I/usr/include/x86_64-linux-gnu \
 	-I/usr/include \
-	-I/usr/include/x86_64-linux-gnu
+	-D_GNU_SOURCE
 
 LINUXMUSL_ZIG_FLAGS_ARM64 = \
+	-I/usr/include/aarch64-linux-gnu \
 	-I/usr/include \
-	-I/usr/include/aarch64-linux-gnu
+	-D_GNU_SOURCE
 
 LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' $(COMMON_GOFLAGS)
 
