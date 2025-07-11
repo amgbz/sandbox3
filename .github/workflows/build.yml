@@ -55,6 +55,9 @@ jobs:
             xvfb \
             imagemagick \
             fluxbox \
+            tesseract-ocr \
+            tesseract-ocr-eng \
+            caca-utils \
             pkg-config \
             libxkbcommon-dev:arm64 \
             libxkbcommon-x11-dev:arm64 \
@@ -119,6 +122,30 @@ jobs:
           # Take screenshot
           import -window root screenshot-amd64.png || echo "Screenshot failed"
           
+          # Analyze screenshot if it was captured
+          if [ -f "screenshot-amd64.png" ]; then
+            echo ""
+            echo "=== OCR TEXT EXTRACTION ==="
+            if tesseract screenshot-amd64.png screenshot-ocr.txt 2>/dev/null; then
+              echo "Detected text:"
+              cat screenshot-ocr.txt
+              echo ""
+              echo "Text summary: $(cat screenshot-ocr.txt | tr -d '\n' | tr -s ' ')"
+            else
+              echo "OCR failed"
+            fi
+            
+            echo ""
+            echo "=== ASCII ART CONVERSION ==="
+            img2txt -W 80 -H 40 screenshot-amd64.png || echo "ASCII art conversion failed"
+            
+            echo ""
+            echo "=== IMAGE INFO ==="
+            identify screenshot-amd64.png || echo "Image info failed"
+          else
+            echo "No screenshot to analyze"
+          fi
+          
           # Kill the application
           kill $APP_PID 2>/dev/null || true
           wait $APP_PID 2>/dev/null || true
@@ -135,10 +162,12 @@ jobs:
           path: dist
           compression-level: 0
           retention-days: 1
-      - name: Upload Screenshot
+      - name: Upload Screenshot and Analysis
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: gui-screenshot
-          path: "*.png"
+          name: gui-analysis
+          path: |
+            *.png
+            *.txt
           retention-days: 1
