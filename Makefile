@@ -37,7 +37,6 @@ LINUXGNU_ZIG_FLAGS_ARM64 = \
 	-DL_tmpnam=20
 
 LINUXMUSL_ZIG_FLAGS_AMD64 = \
-	-I/usr/include/x86_64-linux-gnu \
 	-L/usr/lib/x86_64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/x86_64-linux-gnu \
@@ -47,7 +46,6 @@ LINUXMUSL_ZIG_FLAGS_AMD64 = \
 	-D_POSIX_C_SOURCE=200809L
 
 LINUXMUSL_ZIG_FLAGS_ARM64 = \
-	-I/usr/include/aarch64-linux-gnu \
 	-L/usr/lib/aarch64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/aarch64-linux-gnu \
