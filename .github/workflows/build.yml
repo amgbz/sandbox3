@@ -363,7 +363,6 @@ jobs:
           
           echo "GUI test completed"
       - name: Install Wine
-        continue-on-error: true
         run: |
           set -x
           
