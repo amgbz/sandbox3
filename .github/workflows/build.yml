@@ -52,6 +52,9 @@ jobs:
             musl-tools \
             gcc-aarch64-linux-gnu \
             libc6-dev-arm64-cross \
+            xvfb \
+            imagemagick \
+            fluxbox \
             pkg-config \
             libxkbcommon-dev:arm64 \
             libxkbcommon-x11-dev:arm64 \
@@ -86,12 +89,56 @@ jobs:
           go env
           go mod vendor
           make all
-      - name: Test
+      - name: Test GUI Application
         run: |
-          ./dist/linuxgnu-amd64/demo || true
-      - name: Upload Artifacts
+          set -x
+          
+          # Start Xvfb virtual framebuffer
+          export DISPLAY=:99
+          Xvfb :99 -screen 0 1024x768x24 &
+          XVFB_PID=$!
+          
+          # Wait for X server to start
+          sleep 2
+          
+          # Start lightweight window manager
+          fluxbox &
+          FLUXBOX_PID=$!
+          
+          # Wait for window manager
+          sleep 2
+          
+          # Test the GUI application with timeout and screenshot
+          echo "Testing linuxgnu-amd64 GUI application..."
+          timeout 30s ./dist/linuxgnu-amd64/demo &
+          APP_PID=$!
+          
+          # Wait a bit for the app to render
+          sleep 5
+          
+          # Take screenshot
+          import -window root screenshot-amd64.png || echo "Screenshot failed"
+          
+          # Kill the application
+          kill $APP_PID 2>/dev/null || true
+          wait $APP_PID 2>/dev/null || true
+          
+          # Clean up
+          kill $FLUXBOX_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          
+          echo "GUI test completed"
+      - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
         with:
+          name: binaries
           path: dist
           compression-level: 0
+          retention-days: 1
+      - name: Upload Screenshot
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-screenshot
+          path: "*.png"
           retention-days: 1
