@@ -64,6 +64,7 @@ jobs:
             x11-apps \
             wmctrl \
             pkg-config \
+            file \
             libxkbcommon-dev:arm64 \
             libxkbcommon-x11-dev:arm64 \
             libwayland-dev:arm64 \
@@ -274,41 +275,55 @@ jobs:
             if ! chafa screenshot-amd64.png --width 40 --height 20 > /dev/null 2>&1; then
               echo "chafa cannot process the screenshot file, trying to debug..."
               ls -la screenshot-amd64.png
-              file screenshot-amd64.png
+              file screenshot-amd64.png || echo "file command not available"
+              echo "Trying basic chafa without options..."
+              chafa screenshot-amd64.png 2>&1 | head -5 || echo "Basic chafa failed"
             fi
             
             # Standard ASCII art (80 characters wide)
             echo "Attempting standard ASCII conversion..."
-            if chafa screenshot-amd64.png --width 80 --format ansi 2>&1 > ascii-standard.txt; then
-              echo ""
-              echo "Standard ASCII (80 chars wide) - SUCCESS"
-              cat ascii-standard.txt
-            else
-              echo "Standard ASCII conversion failed, trying without format option..."
-              if chafa screenshot-amd64.png --width 80 2>&1 > ascii-standard.txt; then
-                echo "Standard ASCII (no format) - SUCCESS"
+            if chafa screenshot-amd64.png --width 80 > ascii-standard.txt 2>&1; then
+              if [ -s ascii-standard.txt ]; then
+                echo ""
+                echo "Standard ASCII (80 chars wide) - SUCCESS"
                 cat ascii-standard.txt
               else
-                echo "Standard ASCII conversion failed completely"
+                echo "Standard ASCII conversion created empty file"
+              fi
+            else
+              echo "Standard ASCII conversion failed, trying basic chafa..."
+              if chafa screenshot-amd64.png > ascii-standard.txt 2>&1; then
+                echo "Basic ASCII - SUCCESS"
+                cat ascii-standard.txt
+              else
+                echo "All ASCII conversion attempts failed"
               fi
             fi
             
             echo ""
             echo "--- Compact ASCII (60 chars) ---"
             # Compact version  
-            if chafa screenshot-amd64.png --width 60 --height 40 2>&1 > ascii-compact.txt; then
-              echo "Compact ASCII - SUCCESS"
-              cat ascii-compact.txt
+            if chafa screenshot-amd64.png --width 60 > ascii-compact.txt 2>&1; then
+              if [ -s ascii-compact.txt ]; then
+                echo "Compact ASCII - SUCCESS"
+                cat ascii-compact.txt
+              else
+                echo "Compact ASCII conversion created empty file"
+              fi
             else
               echo "Compact ASCII conversion failed"
             fi
             
             echo ""
             echo "--- ANSI Colored ASCII ---"
-            # ANSI colored version with symbols
-            if chafa screenshot-amd64.png --width 70 --colors 256 2>&1 > ascii-colored.txt; then
-              echo "ANSI colored ASCII - SUCCESS"
-              cat ascii-colored.txt
+            # ANSI colored version with colors
+            if chafa screenshot-amd64.png --width 70 --colors 256 > ascii-colored.txt 2>&1; then
+              if [ -s ascii-colored.txt ]; then
+                echo "ANSI colored ASCII - SUCCESS"
+                cat ascii-colored.txt
+              else
+                echo "ANSI colored ASCII conversion created empty file"
+              fi
             else
               echo "ANSI colored ASCII conversion failed"
             fi
@@ -316,9 +331,13 @@ jobs:
             echo ""
             echo "--- Simple ASCII (no color) ---"
             # Simple ASCII version without colors
-            if chafa screenshot-amd64.png --width 80 --colors 1 2>&1 > ascii-simple.txt; then
-              echo "Simple ASCII - SUCCESS"
-              cat ascii-simple.txt
+            if chafa screenshot-amd64.png --width 80 --colors 2 > ascii-simple.txt 2>&1; then
+              if [ -s ascii-simple.txt ]; then
+                echo "Simple ASCII - SUCCESS"
+                cat ascii-simple.txt
+              else
+                echo "Simple ASCII conversion created empty file"
+              fi
             else
               echo "Simple ASCII conversion failed"
             fi
