@@ -90,30 +90,16 @@ jobs:
             libxcursor1:arm64 \
             libxfixes3:arm64 \
             libegl1-mesa:arm64
-      - name: Install img2txt
+      - name: Install chafa
         run: |
-          # Follow GitHub recommendations exactly
-          echo "Creating virtual environment for img2txt..."
-          python3 -m venv /tmp/img2txt-venv
-          
-          echo "Activating virtual environment..."
-          source /tmp/img2txt-venv/bin/activate
-          
-          echo "Installing img2txt.py (correct package name)..."
-          pip install img2txt.py
-          
-          echo "Making img2txt globally available..."
-          # Create a wrapper script to use the venv version
-          cat > /usr/local/bin/img2txt << 'EOF'
-#!/bin/bash
-source /tmp/img2txt-venv/bin/activate
-python -m img2txt "$@"
-EOF
-          chmod +x /usr/local/bin/img2txt
+          echo "Installing chafa for ASCII art conversion..."
+          apt-get update -yq
+          apt-get install -yq chafa
           
           # Verify installation
-          echo "Verifying img2txt installation..."
-          /usr/local/bin/img2txt --help | head -5 || echo "img2txt verification failed"
+          echo "Verifying chafa installation..."
+          chafa --version || echo "chafa verification failed"
+          chafa --help | head -10 || echo "chafa help failed"
       - name: Build
         run: |
           set -x
@@ -273,11 +259,11 @@ EOF
             echo ""
             echo "=== ASCII ART CONVERSION ==="
             
-            # Try multiple ASCII art versions with different settings
-            echo "Generating ASCII art representations..."
+            # Try multiple ASCII art versions with different settings using chafa
+            echo "Generating ASCII art representations with chafa..."
             
             # Standard ASCII art (80 characters wide)
-            if img2txt screenshot-amd64.png --maxLen 80 --antialias > ascii-standard.txt 2>/dev/null; then
+            if chafa screenshot-amd64.png --width 80 --format ansi > ascii-standard.txt 2>/dev/null; then
               echo ""
               echo "Standard ASCII (80 chars wide) - SUCCESS"
               cat ascii-standard.txt
@@ -288,7 +274,7 @@ EOF
             echo ""
             echo "--- Compact ASCII (60 chars) ---"
             # Compact version  
-            if img2txt screenshot-amd64.png --maxLen 60 --fontSize 8 --antialias > ascii-compact.txt 2>/dev/null; then
+            if chafa screenshot-amd64.png --width 60 --height 40 --format ansi > ascii-compact.txt 2>/dev/null; then
               echo "Compact ASCII - SUCCESS"
               cat ascii-compact.txt
             else
@@ -297,12 +283,22 @@ EOF
             
             echo ""
             echo "--- ANSI Colored ASCII ---"
-            # ANSI colored version
-            if img2txt screenshot-amd64.png --maxLen 70 --ansi --antialias --dither --targetAspect=0.5 > ascii-colored.txt 2>/dev/null; then
+            # ANSI colored version with symbols
+            if chafa screenshot-amd64.png --width 70 --format ansi --colors 256 --symbols all > ascii-colored.txt 2>/dev/null; then
               echo "ANSI colored ASCII - SUCCESS"
               cat ascii-colored.txt
             else
               echo "ANSI colored ASCII conversion failed"
+            fi
+            
+            echo ""
+            echo "--- Simple ASCII (no color) ---"
+            # Simple ASCII version without colors
+            if chafa screenshot-amd64.png --width 80 --format ansi --colors 1 --symbols ascii > ascii-simple.txt 2>/dev/null; then
+              echo "Simple ASCII - SUCCESS"
+              cat ascii-simple.txt
+            else
+              echo "Simple ASCII conversion failed"
             fi
             
             echo ""
