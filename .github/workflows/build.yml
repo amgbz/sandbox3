@@ -272,7 +272,7 @@ jobs:
             
             # Test if chafa is working first
             echo "Testing chafa with screenshot file..."
-            if ! chafa screenshot-amd64.png --width 40 --height 20 > /dev/null 2>&1; then
+            if ! chafa screenshot-amd64.png -s 40x20 > /dev/null 2>&1; then
               echo "chafa cannot process the screenshot file, trying to debug..."
               ls -la screenshot-amd64.png
               file screenshot-amd64.png || echo "file command not available"
@@ -282,7 +282,7 @@ jobs:
             
             # Standard ASCII art (80 characters wide)
             echo "Attempting standard ASCII conversion..."
-            if chafa screenshot-amd64.png --width 80 > ascii-standard.txt 2>&1; then
+            if chafa screenshot-amd64.png -s 80x60 > ascii-standard.txt 2>&1; then
               if [ -s ascii-standard.txt ]; then
                 echo ""
                 echo "Standard ASCII (80 chars wide) - SUCCESS"
@@ -303,7 +303,7 @@ jobs:
             echo ""
             echo "--- Compact ASCII (60 chars) ---"
             # Compact version  
-            if chafa screenshot-amd64.png --width 60 > ascii-compact.txt 2>&1; then
+            if chafa screenshot-amd64.png -s 60x40 > ascii-compact.txt 2>&1; then
               if [ -s ascii-compact.txt ]; then
                 echo "Compact ASCII - SUCCESS"
                 cat ascii-compact.txt
@@ -317,7 +317,7 @@ jobs:
             echo ""
             echo "--- ANSI Colored ASCII ---"
             # ANSI colored version with colors
-            if chafa screenshot-amd64.png --width 70 --colors 256 > ascii-colored.txt 2>&1; then
+            if chafa screenshot-amd64.png -s 70x50 -c 256 > ascii-colored.txt 2>&1; then
               if [ -s ascii-colored.txt ]; then
                 echo "ANSI colored ASCII - SUCCESS"
                 cat ascii-colored.txt
@@ -331,7 +331,7 @@ jobs:
             echo ""
             echo "--- Simple ASCII (no color) ---"
             # Simple ASCII version without colors
-            if chafa screenshot-amd64.png --width 80 --colors 2 > ascii-simple.txt 2>&1; then
+            if chafa screenshot-amd64.png -s 80x60 -c 2 > ascii-simple.txt 2>&1; then
               if [ -s ascii-simple.txt ]; then
                 echo "Simple ASCII - SUCCESS"
                 cat ascii-simple.txt
