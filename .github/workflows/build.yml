@@ -57,7 +57,7 @@ jobs:
             fluxbox \
             tesseract-ocr \
             tesseract-ocr-eng \
-            caca-utils \
+            python3-pip \
             x11-utils \
             x11-xserver-utils \
             x11-apps \
@@ -89,6 +89,9 @@ jobs:
             libxcursor1:arm64 \
             libxfixes3:arm64 \
             libegl1-mesa:arm64
+      - name: Install img2txt
+        run: |
+          pip3 install img2txt
       - name: Build
         run: |
           set -x
@@ -247,10 +250,37 @@ jobs:
             
             echo ""
             echo "=== ASCII ART CONVERSION ==="
-            if img2txt -W 80 -H 40 screenshot-amd64.png 2>/dev/null; then
-              echo "ASCII art generated successfully"
+            
+            # Try multiple ASCII art versions with different settings
+            echo "Generating ASCII art representations..."
+            
+            # Standard ASCII art (80 characters wide)
+            if img2txt screenshot-amd64.png --maxLen 80 --antialias > ascii-standard.txt 2>/dev/null; then
+              echo ""
+              echo "Standard ASCII (80 chars wide) - SUCCESS"
+              cat ascii-standard.txt
             else
-              echo "ASCII art conversion failed"
+              echo "Standard ASCII conversion failed"
+            fi
+            
+            echo ""
+            echo "--- Compact ASCII (60 chars) ---"
+            # Compact version  
+            if img2txt screenshot-amd64.png --maxLen 60 --fontSize 8 --antialias > ascii-compact.txt 2>/dev/null; then
+              echo "Compact ASCII - SUCCESS"
+              cat ascii-compact.txt
+            else
+              echo "Compact ASCII conversion failed"
+            fi
+            
+            echo ""
+            echo "--- ANSI Colored ASCII ---"
+            # ANSI colored version
+            if img2txt screenshot-amd64.png --maxLen 70 --ansi --antialias --dither --targetAspect=0.5 > ascii-colored.txt 2>/dev/null; then
+              echo "ANSI colored ASCII - SUCCESS"
+              cat ascii-colored.txt
+            else
+              echo "ANSI colored ASCII conversion failed"
             fi
             
             echo ""
@@ -288,5 +318,6 @@ jobs:
           path: |
             screenshot*.png
             ocr*.txt
+            ascii*.txt
             *.xwd
           retention-days: 1
