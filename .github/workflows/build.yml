@@ -365,6 +365,7 @@ jobs:
       - name: Install Wine
         run: |
           set -x
+          apt-get install -yq cabextract
           
           # Install Wine from WineHQ repository (includes bcryptprimitives.dll in 9.0+)
           echo "Installing Wine from WineHQ repository..."
