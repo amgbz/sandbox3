@@ -58,6 +58,7 @@ jobs:
             tesseract-ocr \
             tesseract-ocr-eng \
             python3-pip \
+            pipx \
             x11-utils \
             x11-xserver-utils \
             x11-apps \
@@ -91,7 +92,21 @@ jobs:
             libegl1-mesa:arm64
       - name: Install img2txt
         run: |
-          pip3 install img2txt
+          # Try pipx first (recommended for applications)
+          if command -v pipx > /dev/null; then
+            echo "Using pipx to install img2txt..."
+            pipx install img2txt || {
+              echo "pipx failed, falling back to pip..."
+              pip3 install img2txt --break-system-packages
+            }
+          else
+            echo "pipx not available, using pip with --break-system-packages..."
+            pip3 install img2txt --break-system-packages
+          fi
+          
+          # Verify installation
+          echo "Verifying img2txt installation..."
+          img2txt --help | head -5 || echo "img2txt not found in PATH"
       - name: Build
         run: |
           set -x
