@@ -37,38 +37,36 @@ LINUXGNU_ZIG_FLAGS_ARM64 = \
 	-DL_tmpnam=20
 
 LINUXMUSL_ZIG_FLAGS_AMD64 = \
-	-isystem/usr/include/vulkan \
-	-isystem/usr/include/xkbcommon \
-	-isystem/usr/include/wayland \
-	-isystem/usr/include/GL \
-	-isystem/usr/include/EGL \
-	-isystem/usr/include/X11 \
-	-isystem/usr/include/xcb \
+	-I/usr/include \
 	-L/usr/lib/x86_64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/x86_64-linux-gnu \
 	-L/lib \
+	-D__MUSL__ \
 	-D_GNU_SOURCE \
 	-D_DEFAULT_SOURCE \
-	-D_POSIX_C_SOURCE=200809L
+	-D_POSIX_C_SOURCE=200809L \
+	-D__BEGIN_DECLS= \
+	-D__END_DECLS= \
+	-D__THROW= \
+	-D__wur=
 
 LINUXMUSL_ZIG_FLAGS_ARM64 = \
-	-isystem/usr/include/vulkan \
-	-isystem/usr/include/xkbcommon \
-	-isystem/usr/include/wayland \
-	-isystem/usr/include/GL \
-	-isystem/usr/include/EGL \
-	-isystem/usr/include/X11 \
-	-isystem/usr/include/xcb \
+	-I/usr/include \
 	-L/usr/lib/aarch64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/aarch64-linux-gnu \
 	-L/lib \
+	-D__MUSL__ \
 	-D_GNU_SOURCE \
 	-D_DEFAULT_SOURCE \
 	-D_POSIX_C_SOURCE=200809L \
 	-D__USE_MISC \
-	-DL_tmpnam=20
+	-DL_tmpnam=20 \
+	-D__BEGIN_DECLS= \
+	-D__END_DECLS= \
+	-D__THROW= \
+	-D__wur=
 
 LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' $(COMMON_GOFLAGS)
 
