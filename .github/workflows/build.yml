@@ -366,11 +366,24 @@ jobs:
         run: |
           set -x
           
-          # Install Wine
-          echo "Installing Wine..."
+          # Install Wine from WineHQ repository (includes bcryptprimitives.dll in 9.0+)
+          echo "Installing Wine from WineHQ repository..."
+          
+          # Add WineHQ repository
           dpkg --add-architecture i386
+          mkdir -pm755 /etc/apt/keyrings
+          wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
+          wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
+          
+          # Update package list
           apt-get update -yq
-          apt-get install -yq wine wine32 wine64 xvfb curl
+          
+          # Install Wine stable (9.0+) from WineHQ
+          apt-get install -yq --install-recommends winehq-stable xvfb curl
+          
+          # Verify Wine installation
+          echo "Wine version:"
+          wine --version || echo "Wine version check failed"
           
           # Download and install winetricks
           echo "Installing winetricks..."
@@ -395,19 +408,9 @@ jobs:
           wine --version
           wineboot --init 2>/dev/null || true
           
-          # Install additional Windows components needed for Go applications
-          echo "Installing Windows components for Go applications..."
-          winetricks -q vcrun2022 2>/dev/null || echo "vcrun2022 installation failed"
+          # Install minimal Windows components
+          echo "Installing basic Windows components..."
           winetricks -q corefonts 2>/dev/null || echo "corefonts installation failed"
-          
-          # Try to install bcryptprimitives.dll if available
-          echo "Attempting to install bcryptprimitives.dll..."
-          winetricks -q bcryptprimitives 2>/dev/null || echo "bcryptprimitives not available via winetricks"
-          
-          # Configure Wine for better Go application support
-          echo "Configuring Wine for Go applications..."
-          wine reg add "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\Environment" /v "GOOS" /t REG_SZ /d "windows" /f 2>/dev/null || true
-          wine reg add "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\Environment" /v "GOARCH" /t REG_SZ /d "amd64" /f 2>/dev/null || true
           
           # Set up X11 environment for Wine
           export XDG_SESSION_TYPE=x11
@@ -444,7 +447,7 @@ jobs:
           # Run the Windows application with Wine in background
           echo "Starting Windows application with Wine..."
           if [ -f "./dist/windows-amd64/demo.exe" ]; then
-            echo "Attempting to run Wine application..."
+            echo "Running Wine application with Wine 9.0+ (includes bcryptprimitives.dll)..."
             timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output.log 2>&1 &
             WINE_APP_PID=$!
             echo "Wine application PID: $WINE_APP_PID"
@@ -454,21 +457,11 @@ jobs:
             
             # Check if Wine application is still running
             if ps -p $WINE_APP_PID > /dev/null; then
-              echo "Wine application is running"
+              echo "Wine application is running successfully"
             else
               echo "Wine application may have exited early"
               echo "Wine output log:"
               cat wine-output.log 2>/dev/null || echo "No wine output log"
-              
-              # If it failed due to DLL issues, try alternative approach
-              if grep -q "bcryptprimitives.dll" wine-output.log 2>/dev/null; then
-                echo "Detected bcryptprimitives.dll issue - trying alternative Wine configuration..."
-                export WINEDLLOVERRIDES="bcryptprimitives=n"
-                timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output-alt.log 2>&1 &
-                WINE_APP_PID=$!
-                echo "Alternative Wine application PID: $WINE_APP_PID"
-                sleep 5
-              fi
             fi
             
             # Wait more for the app to render
