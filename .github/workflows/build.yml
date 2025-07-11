@@ -30,6 +30,8 @@ jobs:
             libxinerama-dev \
             libxcursor-dev \
             libxi-dev \
+            libegl1-mesa-dev \
+            libgl1-mesa-dev \
             pkg-config \
             libxkbcommon-dev:arm64 \
             libwayland-dev:arm64 \
@@ -38,7 +40,9 @@ jobs:
             libxrandr-dev:arm64 \
             libxinerama-dev:arm64 \
             libxcursor-dev:arm64 \
-            libxi-dev:arm64
+            libxi-dev:arm64 \
+            libegl1-mesa-dev:arm64 \
+            libgl1-mesa-dev:arm64
       - name: Build
         run: |
           set -x
