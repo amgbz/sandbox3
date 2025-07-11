@@ -362,7 +362,7 @@ jobs:
           kill $XVFB_PID 2>/dev/null || true
           
           echo "GUI test completed"
-      - name: Test Windows GUI Application with Wine
+      - name: Install Wine
         continue-on-error: true
         run: |
           set -x
@@ -371,8 +371,13 @@ jobs:
           echo "Installing Wine..."
           dpkg --add-architecture i386
           apt-get update -yq
-          apt-get install -yq wine wine32 wine64 xvfb
-          
+          apt-get install -yq wine wine32 wine64 xvfb winetricks
+
+      - name: Test Windows GUI Application with Wine
+        continue-on-error: true
+        run: |
+          set -x
+
           # Set up Wine environment
           export WINEARCH=win64
           export WINEPREFIX=/tmp/wine-prefix
@@ -382,6 +387,20 @@ jobs:
           echo "Initializing Wine..."
           wine --version
           wineboot --init 2>/dev/null || true
+          
+          # Install additional Windows components needed for Go applications
+          echo "Installing Windows components for Go applications..."
+          winetricks -q vcrun2022 2>/dev/null || echo "vcrun2022 installation failed"
+          winetricks -q corefonts 2>/dev/null || echo "corefonts installation failed"
+          
+          # Try to install bcryptprimitives.dll if available
+          echo "Attempting to install bcryptprimitives.dll..."
+          winetricks -q bcryptprimitives 2>/dev/null || echo "bcryptprimitives not available via winetricks"
+          
+          # Configure Wine for better Go application support
+          echo "Configuring Wine for Go applications..."
+          wine reg add "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\Environment" /v "GOOS" /t REG_SZ /d "windows" /f 2>/dev/null || true
+          wine reg add "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Control\\Session Manager\\Environment" /v "GOARCH" /t REG_SZ /d "amd64" /f 2>/dev/null || true
           
           # Set up X11 environment for Wine
           export XDG_SESSION_TYPE=x11
@@ -418,7 +437,8 @@ jobs:
           # Run the Windows application with Wine in background
           echo "Starting Windows application with Wine..."
           if [ -f "./dist/windows-amd64/demo.exe" ]; then
-            timeout 30s wine ./dist/windows-amd64/demo.exe &
+            echo "Attempting to run Wine application..."
+            timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output.log 2>&1 &
             WINE_APP_PID=$!
             echo "Wine application PID: $WINE_APP_PID"
             
@@ -430,6 +450,18 @@ jobs:
               echo "Wine application is running"
             else
               echo "Wine application may have exited early"
+              echo "Wine output log:"
+              cat wine-output.log 2>/dev/null || echo "No wine output log"
+              
+              # If it failed due to DLL issues, try alternative approach
+              if grep -q "bcryptprimitives.dll" wine-output.log 2>/dev/null; then
+                echo "Detected bcryptprimitives.dll issue - trying alternative Wine configuration..."
+                export WINEDLLOVERRIDES="bcryptprimitives=n"
+                timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output-alt.log 2>&1 &
+                WINE_APP_PID=$!
+                echo "Alternative Wine application PID: $WINE_APP_PID"
+                sleep 5
+              fi
             fi
             
             # Wait more for the app to render
@@ -507,5 +539,6 @@ jobs:
             ascii*.txt
             wine-*.txt
             wine-*.png
+            wine-*.log
             *.xwd
           retention-days: 1
