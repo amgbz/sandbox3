@@ -369,42 +369,14 @@ jobs:
           # Install Wine from WineHQ repository (includes bcryptprimitives.dll in 9.0+)
           echo "Installing Wine from WineHQ repository..."
           
-          # Debug: Show OS information
-          echo "========================================="
-          echo "OS Detection Debug Info:"
-          cat /etc/os-release || echo "No /etc/os-release found"
-          lsb_release -a 2>/dev/null || echo "No lsb_release command"
-          echo "========================================="
-          
-          # Add WineHQ repository - detect OS and use correct repository
+          # Add WineHQ repository for Ubuntu 24.04 Noble
           dpkg --add-architecture i386
           mkdir -pm755 /etc/apt/keyrings
           wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
           
-          # Detect Ubuntu version and use appropriate repository
-          if grep -qi "ubuntu" /etc/os-release 2>/dev/null; then
-            UBUNTU_CODENAME=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2 | tr -d '"')
-            echo "Detected Ubuntu, codename: $UBUNTU_CODENAME"
-            
-            if [ "$UBUNTU_CODENAME" = "noble" ]; then
-              echo "Using Ubuntu 24.04 Noble repository..."
-              wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
-            elif [ "$UBUNTU_CODENAME" = "jammy" ]; then
-              echo "Using Ubuntu 22.04 Jammy repository..."
-              wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/jammy/winehq-jammy.sources
-            else
-              echo "Unknown Ubuntu version ($UBUNTU_CODENAME), trying Noble repository..."
-              wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
-            fi
-          elif grep -qi "debian" /etc/os-release 2>/dev/null; then
-            echo "Detected Debian, using Debian repository..."
-            DEBIAN_CODENAME=$(grep VERSION_CODENAME /etc/os-release | cut -d= -f2 | tr -d '"')
-            echo "Debian codename: $DEBIAN_CODENAME"
-            echo "deb https://dl.winehq.org/wine-builds/debian/ $DEBIAN_CODENAME main" > /etc/apt/sources.list.d/winehq.list
-          else
-            echo "Unknown OS, defaulting to Ubuntu Noble repository..."
-            wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
-          fi
+          # Use Ubuntu 24.04 Noble repository (hardcoded)
+          echo "Using Ubuntu 24.04 Noble Wine repository..."
+          wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/ubuntu/dists/noble/winehq-noble.sources
           
           # Update package list
           apt-get update -yq
