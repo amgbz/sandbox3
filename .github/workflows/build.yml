@@ -412,6 +412,18 @@ jobs:
           echo "Installing basic Windows components..."
           winetricks -q corefonts 2>/dev/null || echo "corefonts installation failed"
           
+          # Configure Wine graphics settings for better GUI app support
+          echo "Configuring Wine graphics settings..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "VideoMemorySize" /t REG_SZ /d "1024" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "OffscreenRenderingMode" /t REG_SZ /d "fbo" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "UseGLSL" /t REG_SZ /d "enabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "Multisampling" /t REG_SZ /d "enabled" /f 2>/dev/null || true
+          
+          # Set up virtual desktop mode for better compatibility
+          echo "Setting up virtual desktop mode..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Explorer" /v "Desktop" /t REG_SZ /d "Default" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Explorer\\Desktops" /v "Default" /t REG_SZ /d "1024x768" /f 2>/dev/null || true
+          
           # Set up X11 environment for Wine
           export XDG_SESSION_TYPE=x11
           export XDG_RUNTIME_DIR=/tmp/runtime-wine
@@ -460,21 +472,57 @@ jobs:
               echo "Wine application is running successfully"
             else
               echo "Wine application may have exited early"
-              echo "Wine output log:"
-              cat wine-output.log 2>/dev/null || echo "No wine output log"
             fi
+            
+            # Always print the Wine log for debugging
+            echo ""
+            echo "=== WINE OUTPUT LOG ==="
+            cat wine-output.log 2>/dev/null || echo "No wine output log"
+            echo "=== END WINE OUTPUT LOG ==="
+            echo ""
             
             # Wait more for the app to render
             sleep 5
+            
+            # Check what processes are running
+            echo "Checking running processes..."
+            ps aux | grep -E "(wine|demo)" | grep -v grep || echo "No wine/demo processes found"
+            
+            # Check Wine desktop windows
+            echo "Checking Wine windows..."
+            xwininfo -root -tree -display :98 | grep -E "(demo|Wine|Default)" || echo "No Wine windows found"
             
             # Take screenshot of Wine application
             echo "Taking Wine screenshot..."
             import -window root -display :98 screenshot-wine-amd64.png 2>/dev/null || echo "Wine screenshot failed"
             
-            # Check if screenshot was created
-            if [ -f "screenshot-wine-amd64.png" ] && [ -s "screenshot-wine-amd64.png" ]; then
-              echo "Wine screenshot captured successfully"
+            # Try to capture specific Wine window if it exists
+            echo "Attempting to capture Wine desktop window..."
+            WINE_WINDOW=$(xwininfo -root -tree -display :98 | grep "Wine desktop" | head -1 | awk '{print $1}' || echo "")
+            if [ -n "$WINE_WINDOW" ]; then
+              echo "Found Wine desktop window: $WINE_WINDOW"
+              import -window "$WINE_WINDOW" -display :98 screenshot-wine-desktop.png 2>/dev/null || echo "Wine desktop screenshot failed"
+            else
+              echo "No Wine desktop window found"
+            fi
+            
+            # Check if screenshot was created and pick the best one
+            WINE_SCREENSHOT=""
+            if [ -f "screenshot-wine-desktop.png" ] && [ -s "screenshot-wine-desktop.png" ]; then
+              echo "Wine desktop screenshot captured successfully"
+              ls -la screenshot-wine-desktop.png
+              WINE_SCREENSHOT="screenshot-wine-desktop.png"
+            elif [ -f "screenshot-wine-amd64.png" ] && [ -s "screenshot-wine-amd64.png" ]; then
+              echo "Wine root screenshot captured successfully"
               ls -la screenshot-wine-amd64.png
+              WINE_SCREENSHOT="screenshot-wine-amd64.png"
+            else
+              echo "No Wine screenshot captured"
+            fi
+            
+            if [ -n "$WINE_SCREENSHOT" ]; then
+              # Copy the best screenshot to the standard name for processing
+              cp "$WINE_SCREENSHOT" screenshot-wine-amd64.png
               
               # Create 2x scaled version for better OCR
               echo "Creating 2x scaled image for OCR..."
@@ -540,5 +588,6 @@ jobs:
             wine-*.txt
             wine-*.png
             wine-*.log
+            screenshot-wine-desktop.png
             *.xwd
           retention-days: 1
