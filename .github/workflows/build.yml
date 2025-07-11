@@ -58,7 +58,7 @@ jobs:
             tesseract-ocr \
             tesseract-ocr-eng \
             python3-pip \
-            pipx \
+            python3-venv \
             x11-utils \
             x11-xserver-utils \
             x11-apps \
@@ -92,21 +92,28 @@ jobs:
             libegl1-mesa:arm64
       - name: Install img2txt
         run: |
-          # Try pipx first (recommended for applications)
-          if command -v pipx > /dev/null; then
-            echo "Using pipx to install img2txt..."
-            pipx install img2txt || {
-              echo "pipx failed, falling back to pip..."
-              pip3 install img2txt --break-system-packages
-            }
-          else
-            echo "pipx not available, using pip with --break-system-packages..."
-            pip3 install img2txt --break-system-packages
-          fi
+          # Follow GitHub recommendations exactly
+          echo "Creating virtual environment for img2txt..."
+          python3 -m venv /tmp/img2txt-venv
+          
+          echo "Activating virtual environment..."
+          source /tmp/img2txt-venv/bin/activate
+          
+          echo "Installing img2txt.py (correct package name)..."
+          pip install img2txt.py
+          
+          echo "Making img2txt globally available..."
+          # Create a wrapper script to use the venv version
+          cat > /usr/local/bin/img2txt << 'EOF'
+#!/bin/bash
+source /tmp/img2txt-venv/bin/activate
+python -m img2txt "$@"
+EOF
+          chmod +x /usr/local/bin/img2txt
           
           # Verify installation
           echo "Verifying img2txt installation..."
-          img2txt --help | head -5 || echo "img2txt not found in PATH"
+          /usr/local/bin/img2txt --help | head -5 || echo "img2txt verification failed"
       - name: Build
         run: |
           set -x
