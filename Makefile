@@ -81,7 +81,7 @@ clean:
 	rm -rf dist
 
 .PHONY: linux linuxgnu linuxmusl
-linux: linuxgnu linuxmusl
+linux: linuxgnu
 linuxgnu: dist/linuxgnu-amd64/demo dist/linuxgnu-arm64/demo
 linuxmusl: dist/linuxmusl-amd64/demo dist/linuxmusl-arm64/demo
 
