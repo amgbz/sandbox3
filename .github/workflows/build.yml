@@ -60,6 +60,7 @@ jobs:
             caca-utils \
             x11-utils \
             x11-xserver-utils \
+            x11-apps \
             wmctrl \
             pkg-config \
             libxkbcommon-dev:arm64 \
@@ -118,7 +119,7 @@ jobs:
           
           # Verify X server is running
           echo "Checking X server..."
-          xdpyinfo -display :99 || echo "X server check failed"
+          xdpyinfo -display :99 | head -n 100
           
           # Start lightweight window manager (suppress config warnings)
           fluxbox -display :99 2>/dev/null &
@@ -129,41 +130,119 @@ jobs:
           
           # Test the GUI application with timeout and screenshot
           echo "Testing linuxgnu-amd64 GUI application..."
+          echo "Environment variables:"
+          env | grep -E "(DISPLAY|XDG|WAYLAND|QT|GDK)" | sort
+          
+          # Run the application in background
+          echo "Starting application..."
           timeout 30s ./dist/linuxgnu-amd64/demo &
           APP_PID=$!
+          echo "Application PID: $APP_PID"
           
-          # Wait a bit for the app to render
+          # Wait a bit for the app to start
+          sleep 3
+          
+          # Check if application is still running
+          if ps -p $APP_PID > /dev/null; then
+            echo "Application is running"
+          else
+            echo "Application may have exited early"
+          fi
+          
+          # Wait more for the app to render
           sleep 5
           
           # List any windows that might be open
           echo "Windows currently open:"
           wmctrl -l 2>/dev/null || echo "No wmctrl available"
           
-          # Take screenshot
-          echo "Taking screenshot..."
-          if import -window root screenshot-amd64.png; then
-            echo "Screenshot captured successfully"
-            ls -la screenshot-amd64.png
+          # Get window information
+          echo "Window tree:"
+          xwininfo -tree -root | head -20 || echo "xwininfo failed"
+          
+          # Take multiple screenshots at different times
+          echo "Taking screenshot (attempt 1)..."
+          import -window root screenshot-amd64-raw.png 2>/dev/null || echo "First screenshot failed"
+          
+          # Wait a bit more and try again
+          sleep 3
+          echo "Taking screenshot (attempt 2)..."
+          import -window root screenshot-amd64.png 2>/dev/null || echo "Second screenshot failed"
+          
+          # Try to capture specific window if GUI app is running
+          if pgrep -f "demo" > /dev/null; then
+            echo "Demo process is running, trying window-specific screenshot..."
+            WINDOW_ID=$(xwininfo -root -tree | grep -i "hello\|demo\|gui" | head -1 | cut -d' ' -f6 || echo "")
+            if [ -n "$WINDOW_ID" ]; then
+              echo "Found window ID: $WINDOW_ID"
+              import -window "$WINDOW_ID" screenshot-amd64-window.png 2>/dev/null || echo "Window screenshot failed"
+            fi
+          fi
+          
+          # Check screenshot files
+          echo "Screenshot files created:"
+          ls -la screenshot-*.png 2>/dev/null || echo "No PNG files found"
+          
+          # Use the best available screenshot
+          if [ -f "screenshot-amd64-window.png" ] && [ -s "screenshot-amd64-window.png" ]; then
+            echo "Using window-specific screenshot"
+            cp screenshot-amd64-window.png screenshot-amd64.png
+          elif [ -f "screenshot-amd64.png" ] && [ -s "screenshot-amd64.png" ]; then
+            echo "Using full-screen screenshot"
           else
-            echo "Screenshot failed, trying alternative method..."
-            xwd -root -out screenshot-amd64.xwd && convert screenshot-amd64.xwd screenshot-amd64.png || echo "All screenshot methods failed"
+            echo "No valid screenshot captured"
           fi
           
           # Analyze screenshot if it was captured
           if [ -f "screenshot-amd64.png" ] && [ -s "screenshot-amd64.png" ]; then
             echo ""
+            echo "=== IMAGE PREPROCESSING FOR OCR ==="
+            
+            # Create enhanced versions for better OCR
+            echo "Creating enhanced images for OCR..."
+            
+            # High contrast version
+            convert screenshot-amd64.png -contrast-stretch 0 screenshot-amd64-contrast.png 2>/dev/null || echo "Contrast enhancement failed"
+            
+            # Grayscale with increased contrast
+            convert screenshot-amd64.png -colorspace Gray -normalize -contrast-stretch 5% screenshot-amd64-gray.png 2>/dev/null || echo "Grayscale conversion failed"
+            
+            # Scaled up version (OCR works better on larger text)
+            convert screenshot-amd64.png -resize 200% screenshot-amd64-large.png 2>/dev/null || echo "Scaling failed"
+            
+            # Black and white high contrast
+            convert screenshot-amd64.png -threshold 50% screenshot-amd64-bw.png 2>/dev/null || echo "B&W conversion failed"
+            
+            echo ""
             echo "=== OCR TEXT EXTRACTION ==="
-            if tesseract screenshot-amd64.png screenshot-ocr 2>/dev/null && [ -f "screenshot-ocr.txt" ]; then
-              echo "Detected text:"
-              cat screenshot-ocr.txt 2>/dev/null || echo "Empty OCR output"
-              echo ""
-              if [ -s "screenshot-ocr.txt" ]; then
-                echo "Text summary: $(cat screenshot-ocr.txt | tr -d '\n' | tr -s ' ')"
-              else
-                echo "No text detected in image"
+            
+            # Try OCR on multiple processed versions
+            OCR_SUCCESS=false
+            
+            for img in screenshot-amd64.png screenshot-amd64-large.png screenshot-amd64-gray.png screenshot-amd64-contrast.png screenshot-amd64-bw.png; do
+              if [ -f "$img" ]; then
+                echo "Trying OCR on $img..."
+                if tesseract "$img" "ocr-$(basename $img .png)" -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\ .,:-! 2>/dev/null; then
+                  OCR_FILE="ocr-$(basename $img .png).txt"
+                  if [ -f "$OCR_FILE" ] && [ -s "$OCR_FILE" ]; then
+                    echo "SUCCESS: Text detected in $img:"
+                    cat "$OCR_FILE"
+                    echo ""
+                    # Copy successful result to main OCR file
+                    cp "$OCR_FILE" screenshot-ocr.txt
+                    OCR_SUCCESS=true
+                    break
+                  fi
+                fi
               fi
+            done
+            
+            if [ "$OCR_SUCCESS" = false ]; then
+              echo "OCR failed on all image variants"
+              # Still create empty file for artifact upload
+              touch screenshot-ocr.txt
             else
-              echo "OCR failed or no text found"
+              echo "Text summary: $(cat screenshot-ocr.txt | tr -d '\n' | tr -s ' ')"
             fi
             
             echo ""
@@ -207,6 +286,7 @@ jobs:
         with:
           name: gui-analysis
           path: |
-            *.png
-            *.txt
+            screenshot*.png
+            ocr*.txt
+            *.xwd
           retention-days: 1
