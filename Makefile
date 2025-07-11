@@ -37,7 +37,6 @@ LINUXGNU_ZIG_FLAGS_ARM64 = \
 	-DL_tmpnam=20
 
 LINUXMUSL_ZIG_FLAGS_AMD64 = \
-	-I/usr/include \
 	-L/usr/lib/x86_64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/x86_64-linux-gnu \
@@ -45,14 +44,9 @@ LINUXMUSL_ZIG_FLAGS_AMD64 = \
 	-D__MUSL__ \
 	-D_GNU_SOURCE \
 	-D_DEFAULT_SOURCE \
-	-D_POSIX_C_SOURCE=200809L \
-	-D__BEGIN_DECLS= \
-	-D__END_DECLS= \
-	-D__THROW= \
-	-D__wur=
+	-D_POSIX_C_SOURCE=200809L
 
 LINUXMUSL_ZIG_FLAGS_ARM64 = \
-	-I/usr/include \
 	-L/usr/lib/aarch64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/aarch64-linux-gnu \
@@ -62,13 +56,9 @@ LINUXMUSL_ZIG_FLAGS_ARM64 = \
 	-D_DEFAULT_SOURCE \
 	-D_POSIX_C_SOURCE=200809L \
 	-D__USE_MISC \
-	-DL_tmpnam=20 \
-	-D__BEGIN_DECLS= \
-	-D__END_DECLS= \
-	-D__THROW= \
-	-D__wur=
+	-DL_tmpnam=20
 
-LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' $(COMMON_GOFLAGS)
+LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' -tags 'sqlite_json,sqlite_foreign_keys,sqlite_fts5,headless'
 
 DARWIN_GOFLAGS = --ldflags '-linkmode external -w' $(COMMON_GOFLAGS)
 DARWIN_SDKROOT = $(shell bash $(CURDIR)/scripts/find-darwin-sdkroot.sh)
