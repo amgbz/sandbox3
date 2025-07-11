@@ -48,6 +48,10 @@ jobs:
             libxcursor1 \
             libxfixes3 \
             libegl1-mesa \
+            musl-dev \
+            musl-tools \
+            gcc-aarch64-linux-gnu \
+            libc6-dev-arm64-cross \
             pkg-config \
             libxkbcommon-dev:arm64 \
             libxkbcommon-x11-dev:arm64 \
