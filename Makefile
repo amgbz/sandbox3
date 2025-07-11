@@ -16,23 +16,35 @@ LINUXGNU_ZIG_FLAGS_AMD64 = \
 	-I/usr/include/x86_64-linux-gnu \
 	-I/usr/include \
 	-L/usr/lib/x86_64-linux-gnu \
-	-D_GNU_SOURCE
+	-D_GNU_SOURCE \
+	-D_DEFAULT_SOURCE \
+	-D_POSIX_C_SOURCE=200809L
 
 LINUXGNU_ZIG_FLAGS_ARM64 = \
 	-I/usr/include/aarch64-linux-gnu \
 	-I/usr/include \
 	-L/usr/lib/aarch64-linux-gnu \
-	-D_GNU_SOURCE
+	-D_GNU_SOURCE \
+	-D_DEFAULT_SOURCE \
+	-D_POSIX_C_SOURCE=200809L \
+	-D__USE_MISC \
+	-DL_tmpnam=20
 
 LINUXMUSL_ZIG_FLAGS_AMD64 = \
 	-I/usr/include/x86_64-linux-gnu \
 	-I/usr/include \
-	-D_GNU_SOURCE
+	-D_GNU_SOURCE \
+	-D_DEFAULT_SOURCE \
+	-D_POSIX_C_SOURCE=200809L
 
 LINUXMUSL_ZIG_FLAGS_ARM64 = \
 	-I/usr/include/aarch64-linux-gnu \
 	-I/usr/include \
-	-D_GNU_SOURCE
+	-D_GNU_SOURCE \
+	-D_DEFAULT_SOURCE \
+	-D_POSIX_C_SOURCE=200809L \
+	-D__USE_MISC \
+	-DL_tmpnam=20
 
 LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' $(COMMON_GOFLAGS)
 
