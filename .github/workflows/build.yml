@@ -378,12 +378,18 @@ jobs:
           # Update package list
           apt-get update -yq
           
-          # Install Wine stable (9.0+) from WineHQ
-          apt-get install -yq --install-recommends winehq-stable xvfb curl
+          # Install Wine development version (10.9+ with improved EGL support) from WineHQ
+          apt-get install -yq --install-recommends winehq-devel xvfb curl
           
           # Verify Wine installation
-          echo "Wine version:"
+          echo "========================================="
+          echo "Wine Installation Verification"
+          echo "========================================="
           wine --version || echo "Wine version check failed"
+          echo "Wine path: $(which wine)"
+          echo "Wine prefix: $WINEPREFIX"
+          echo "Wine architecture: $WINEARCH"
+          echo "========================================="
           
           # Download and install winetricks
           echo "Installing winetricks..."
@@ -473,7 +479,7 @@ jobs:
           # Run the Windows application with Wine in background
           echo "Starting Windows application with Wine..."
           if [ -f "./dist/windows-amd64/demo.exe" ]; then
-            echo "Running Wine application with Wine 9.0+ (includes bcryptprimitives.dll)..."
+            echo "Running Wine application with Wine 10.9+ (improved EGL support)..."
             
             # Set environment variables for better graphics compatibility
             export WINEDEBUG=-all
@@ -495,17 +501,35 @@ jobs:
             else
               echo "Wine application may have exited early"
               
-              # Check if it's a graphics-related crash
-              if grep -q "panic\|eglGetDisplay\|dxgi_device_init" wine-output.log 2>/dev/null; then
-                echo "Detected graphics-related crash, creating informative mock screenshot..."
-                convert -size 1024x768 xc:lightgray \
-                  -pointsize 24 -fill black \
-                  -draw "text 50,100 'Wine Graphics Test Failed'" \
-                  -draw "text 50,150 'Go GUI app crashed during graphics init'" \
-                  -draw "text 50,200 'EGL/DirectX not compatible with Wine'" \
-                  -draw "text 50,250 'See wine-output.log for details'" \
-                  -draw "text 50,350 'Wine Version: $(wine --version 2>/dev/null || echo unknown)'" \
-                  -draw "text 50,400 'Graphics: Software rendering (llvmpipe)'" \
+              # Check if it's a graphics-related crash (expected for Gio GUI apps)
+              if grep -q "panic\|eglGetDisplay\|egl.NewContext\|dxgi_device_init\|EGL" wine-output.log 2>/dev/null; then
+                                 echo "Detected EGL/graphics crash with Wine 10.9+, creating informative mock screenshot..."
+                 convert -size 1024x768 xc:lightyellow \
+                   -pointsize 20 -fill darkorange \
+                   -draw "text 50,80 'Wine 10.9+ EGL Test Result'" \
+                   -pointsize 16 -fill black \
+                   -draw "text 50,120 'Status: EGL crash despite improved support'" \
+                   -draw "text 50,150 'Tested: Wine 10.9+ with enhanced EGL implementation'" \
+                   -draw "text 50,180 'Issue: Go Gio GUI still incompatible'" \
+                   -draw "text 50,210 'Crash: eglGetDisplay() -> nil pointer dereference'" \
+                   -draw "text 50,260 'Possible causes:'" \
+                   -draw "text 70,290 '• Gio requires specific EGL extensions'" \
+                   -draw "text 70,320 '• Wine EGL still incomplete for Go apps'" \
+                   -draw "text 70,350 '• Mesa/llvmpipe compatibility issues'" \
+                   -draw "text 50,400 'Next steps: Try Wine staging or native build'" \
+                   -pointsize 14 -fill gray \
+                   -draw "text 50,450 'Wine Version: $(wine --version 2>/dev/null || echo unknown)'" \
+                   -draw "text 50,480 'Graphics: Software rendering (Mesa llvmpipe)'" \
+                   -draw "text 50,510 'Test Date: $(date)'" \
+                   screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
+              else
+                echo "Wine application crashed for unknown reason, creating generic mock screenshot..."
+                convert -size 1024x768 xc:lightcoral \
+                  -pointsize 24 -fill darkred \
+                  -draw "text 50,100 'Wine Test Failed'" \
+                  -pointsize 16 -fill black \
+                  -draw "text 50,150 'Windows application crashed'" \
+                  -draw "text 50,200 'Check wine-output.log for details'" \
                   screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
               fi
             fi
