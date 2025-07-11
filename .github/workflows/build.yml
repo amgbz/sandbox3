@@ -58,6 +58,9 @@ jobs:
             tesseract-ocr \
             tesseract-ocr-eng \
             caca-utils \
+            x11-utils \
+            x11-xserver-utils \
+            wmctrl \
             pkg-config \
             libxkbcommon-dev:arm64 \
             libxkbcommon-x11-dev:arm64 \
@@ -96,20 +99,33 @@ jobs:
         run: |
           set -x
           
-          # Start Xvfb virtual framebuffer
+          # Set up X11 environment (disable Wayland)
           export DISPLAY=:99
-          Xvfb :99 -screen 0 1024x768x24 &
+          export XDG_SESSION_TYPE=x11
+          export XDG_RUNTIME_DIR=/tmp/runtime-root
+          export WAYLAND_DISPLAY=""
+          export QT_QPA_PLATFORM=xcb
+          export GDK_BACKEND=x11
+          mkdir -p $XDG_RUNTIME_DIR
+          chmod 700 $XDG_RUNTIME_DIR
+          
+          # Start Xvfb virtual framebuffer  
+          Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &
           XVFB_PID=$!
           
           # Wait for X server to start
-          sleep 2
+          sleep 3
           
-          # Start lightweight window manager
-          fluxbox &
+          # Verify X server is running
+          echo "Checking X server..."
+          xdpyinfo -display :99 || echo "X server check failed"
+          
+          # Start lightweight window manager (suppress config warnings)
+          fluxbox -display :99 2>/dev/null &
           FLUXBOX_PID=$!
           
           # Wait for window manager
-          sleep 2
+          sleep 3
           
           # Test the GUI application with timeout and screenshot
           echo "Testing linuxgnu-amd64 GUI application..."
@@ -119,31 +135,54 @@ jobs:
           # Wait a bit for the app to render
           sleep 5
           
+          # List any windows that might be open
+          echo "Windows currently open:"
+          wmctrl -l 2>/dev/null || echo "No wmctrl available"
+          
           # Take screenshot
-          import -window root screenshot-amd64.png || echo "Screenshot failed"
+          echo "Taking screenshot..."
+          if import -window root screenshot-amd64.png; then
+            echo "Screenshot captured successfully"
+            ls -la screenshot-amd64.png
+          else
+            echo "Screenshot failed, trying alternative method..."
+            xwd -root -out screenshot-amd64.xwd && convert screenshot-amd64.xwd screenshot-amd64.png || echo "All screenshot methods failed"
+          fi
           
           # Analyze screenshot if it was captured
-          if [ -f "screenshot-amd64.png" ]; then
+          if [ -f "screenshot-amd64.png" ] && [ -s "screenshot-amd64.png" ]; then
             echo ""
             echo "=== OCR TEXT EXTRACTION ==="
-            if tesseract screenshot-amd64.png screenshot-ocr.txt 2>/dev/null; then
+            if tesseract screenshot-amd64.png screenshot-ocr 2>/dev/null && [ -f "screenshot-ocr.txt" ]; then
               echo "Detected text:"
-              cat screenshot-ocr.txt
+              cat screenshot-ocr.txt 2>/dev/null || echo "Empty OCR output"
               echo ""
-              echo "Text summary: $(cat screenshot-ocr.txt | tr -d '\n' | tr -s ' ')"
+              if [ -s "screenshot-ocr.txt" ]; then
+                echo "Text summary: $(cat screenshot-ocr.txt | tr -d '\n' | tr -s ' ')"
+              else
+                echo "No text detected in image"
+              fi
             else
-              echo "OCR failed"
+              echo "OCR failed or no text found"
             fi
             
             echo ""
             echo "=== ASCII ART CONVERSION ==="
-            img2txt -W 80 -H 40 screenshot-amd64.png || echo "ASCII art conversion failed"
+            if img2txt -W 80 -H 40 screenshot-amd64.png 2>/dev/null; then
+              echo "ASCII art generated successfully"
+            else
+              echo "ASCII art conversion failed"
+            fi
             
             echo ""
             echo "=== IMAGE INFO ==="
-            identify screenshot-amd64.png || echo "Image info failed"
+            if identify screenshot-amd64.png 2>/dev/null; then
+              echo "Image analysis completed"
+            else
+              echo "Image info failed"
+            fi
           else
-            echo "No screenshot to analyze"
+            echo "No valid screenshot to analyze"
           fi
           
           # Kill the application
