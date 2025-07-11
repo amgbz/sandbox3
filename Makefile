@@ -58,7 +58,7 @@ LINUXMUSL_ZIG_FLAGS_ARM64 = \
 	-D__USE_MISC \
 	-DL_tmpnam=20
 
-LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' -tags 'sqlite_json,sqlite_foreign_keys,sqlite_fts5,headless'
+LINUXMUSL_GOFLAGS := --ldflags '-linkmode external -w -extldflags -static' $(COMMON_GOFLAGS)
 
 DARWIN_GOFLAGS = --ldflags '-linkmode external -w' $(COMMON_GOFLAGS)
 DARWIN_SDKROOT = $(shell bash $(CURDIR)/scripts/find-darwin-sdkroot.sh)
@@ -104,6 +104,8 @@ dist/linuxgnu-arm64/demo: $(SOURCES)
 dist/linuxmusl-amd64/demo: $(SOURCES)
 	$(eval export CC = $(ZIG_CC) --target=x86_64-linux-musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
 	$(eval export CXX = $(ZIG_CXX) --target=x86_64-linux-musl $(LINUXMUSL_ZIG_FLAGS_AMD64))
+	$(eval export CGO_CFLAGS = $$(pkg-config --cflags xkbcommon wayland-client egl vulkan))
+	$(eval export CGO_LDFLAGS = $$(pkg-config --libs xkbcommon wayland-client egl vulkan))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = amd64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
@@ -112,6 +114,8 @@ dist/linuxmusl-amd64/demo: $(SOURCES)
 dist/linuxmusl-arm64/demo: $(SOURCES)
 	$(eval export CC = $(ZIG_CC) --target=aarch64-linux-musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
 	$(eval export CXX = $(ZIG_CXX) --target=aarch64-linux-musl $(LINUXMUSL_ZIG_FLAGS_ARM64))
+	$(eval export CGO_CFLAGS = $$(pkg-config --cflags xkbcommon wayland-client egl vulkan))
+	$(eval export CGO_LDFLAGS = $$(pkg-config --libs xkbcommon wayland-client egl vulkan))
 	$(eval export GOOS = linux)
 	$(eval export GOARCH = arm64)
 	@echo CC="$(CC)" CXX="$(CXX)" GOOS="$(GOOS)" GOARCH="$(GOARCH)"
