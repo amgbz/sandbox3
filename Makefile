@@ -37,7 +37,13 @@ LINUXGNU_ZIG_FLAGS_ARM64 = \
 	-DL_tmpnam=20
 
 LINUXMUSL_ZIG_FLAGS_AMD64 = \
-	-I/usr/include \
+	-isystem/usr/include/vulkan \
+	-isystem/usr/include/xkbcommon \
+	-isystem/usr/include/wayland \
+	-isystem/usr/include/GL \
+	-isystem/usr/include/EGL \
+	-isystem/usr/include/X11 \
+	-isystem/usr/include/xcb \
 	-L/usr/lib/x86_64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/x86_64-linux-gnu \
@@ -47,7 +53,13 @@ LINUXMUSL_ZIG_FLAGS_AMD64 = \
 	-D_POSIX_C_SOURCE=200809L
 
 LINUXMUSL_ZIG_FLAGS_ARM64 = \
-	-I/usr/include \
+	-isystem/usr/include/vulkan \
+	-isystem/usr/include/xkbcommon \
+	-isystem/usr/include/wayland \
+	-isystem/usr/include/GL \
+	-isystem/usr/include/EGL \
+	-isystem/usr/include/X11 \
+	-isystem/usr/include/xcb \
 	-L/usr/lib/aarch64-linux-gnu \
 	-L/usr/lib \
 	-L/lib/aarch64-linux-gnu \
