@@ -100,6 +100,12 @@ jobs:
           echo "Verifying chafa installation..."
           chafa --version || echo "chafa verification failed"
           chafa --help | head -10 || echo "chafa help failed"
+          
+          # Test with a simple image conversion
+          echo "Testing chafa with a simple test..."
+          echo "P3 3 3 255 255 0 0 0 255 0 0 0 255 255 255 255 255 255 255 0 255 0 0 0 255 0" > test.ppm
+          chafa test.ppm || echo "chafa test failed"
+          rm -f test.ppm
       - name: Build
         run: |
           set -x
@@ -261,20 +267,36 @@ jobs:
             
             # Try multiple ASCII art versions with different settings using chafa
             echo "Generating ASCII art representations with chafa..."
+            echo "Chafa version: $(chafa --version 2>/dev/null || echo 'unknown')"
+            
+            # Test if chafa is working first
+            echo "Testing chafa with screenshot file..."
+            if ! chafa screenshot-amd64.png --width 40 --height 20 > /dev/null 2>&1; then
+              echo "chafa cannot process the screenshot file, trying to debug..."
+              ls -la screenshot-amd64.png
+              file screenshot-amd64.png
+            fi
             
             # Standard ASCII art (80 characters wide)
-            if chafa screenshot-amd64.png --width 80 --format ansi > ascii-standard.txt 2>/dev/null; then
+            echo "Attempting standard ASCII conversion..."
+            if chafa screenshot-amd64.png --width 80 --format ansi 2>&1 > ascii-standard.txt; then
               echo ""
               echo "Standard ASCII (80 chars wide) - SUCCESS"
               cat ascii-standard.txt
             else
-              echo "Standard ASCII conversion failed"
+              echo "Standard ASCII conversion failed, trying without format option..."
+              if chafa screenshot-amd64.png --width 80 2>&1 > ascii-standard.txt; then
+                echo "Standard ASCII (no format) - SUCCESS"
+                cat ascii-standard.txt
+              else
+                echo "Standard ASCII conversion failed completely"
+              fi
             fi
             
             echo ""
             echo "--- Compact ASCII (60 chars) ---"
             # Compact version  
-            if chafa screenshot-amd64.png --width 60 --height 40 --format ansi > ascii-compact.txt 2>/dev/null; then
+            if chafa screenshot-amd64.png --width 60 --height 40 2>&1 > ascii-compact.txt; then
               echo "Compact ASCII - SUCCESS"
               cat ascii-compact.txt
             else
@@ -284,7 +306,7 @@ jobs:
             echo ""
             echo "--- ANSI Colored ASCII ---"
             # ANSI colored version with symbols
-            if chafa screenshot-amd64.png --width 70 --format ansi --colors 256 --symbols all > ascii-colored.txt 2>/dev/null; then
+            if chafa screenshot-amd64.png --width 70 --colors 256 2>&1 > ascii-colored.txt; then
               echo "ANSI colored ASCII - SUCCESS"
               cat ascii-colored.txt
             else
@@ -294,7 +316,7 @@ jobs:
             echo ""
             echo "--- Simple ASCII (no color) ---"
             # Simple ASCII version without colors
-            if chafa screenshot-amd64.png --width 80 --format ansi --colors 1 --symbols ascii > ascii-simple.txt 2>/dev/null; then
+            if chafa screenshot-amd64.png --width 80 --colors 1 2>&1 > ascii-simple.txt; then
               echo "Simple ASCII - SUCCESS"
               cat ascii-simple.txt
             else
