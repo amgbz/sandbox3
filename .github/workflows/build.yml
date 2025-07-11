@@ -370,7 +370,15 @@ jobs:
           echo "Installing Wine..."
           dpkg --add-architecture i386
           apt-get update -yq
-          apt-get install -yq wine wine32 wine64 xvfb winetricks
+          apt-get install -yq wine wine32 wine64 xvfb curl
+          
+          # Download and install winetricks
+          echo "Installing winetricks..."
+          curl -o /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks
+          chmod +x /usr/local/bin/winetricks
+          
+          # Verify winetricks installation
+          winetricks --version || echo "winetricks version check failed"
 
       - name: Test Windows GUI Application with Wine
         continue-on-error: true
