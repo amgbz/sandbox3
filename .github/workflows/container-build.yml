@@ -1,0 +1,45 @@
+name: Build Container
+on:
+  push:
+    paths:
+      - '.github/workflows/container-build.yml'
+      - 'Dockerfile.builder'
+      - 'scripts/**'
+  pull_request:
+    paths:
+      - '.github/workflows/container-build.yml'
+      - 'Dockerfile.builder'
+      - 'scripts/**'
+  schedule:
+    # Rebuild container weekly on Sunday at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  build-container:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Build and push container
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile.builder
+          push: true
+          tags: ghcr.io/${{ github.repository }}/gobuilder:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max 
