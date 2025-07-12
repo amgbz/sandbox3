@@ -91,7 +91,7 @@ jobs:
             libxcb1:arm64 \
             libxcursor1:arm64 \
             libxfixes3:arm64 \
-            libegl1-mesa:arm64
+            libegl1-mesa:arm64 > /dev/null
       - name: Install chafa
         run: |
           echo "Installing chafa for ASCII art conversion..."
@@ -392,7 +392,7 @@ jobs:
           
           # Try to force install winehq-devel with dependency resolution
           echo "Installing winehq-devel with dependency resolution..."
-          apt-get install -yqq --fix-missing --install-recommends winehq-devel xvfb curl || {
+          aptitude install -yqqq --fix-missing --install-recommends winehq-devel xvfb curl || {
             echo "Trying winehq-devel without install-recommends..."
             apt-get install -yq --fix-missing winehq-devel xvfb curl || {
               echo "Trying to fix broken packages and install again..."
