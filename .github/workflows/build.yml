@@ -374,6 +374,13 @@ jobs:
           # Add WineHQ repository for Debian Bookworm
           dpkg --add-architecture i386
           mkdir -pm755 /etc/apt/keyrings
+          echo 'deb http://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_12/ /' | sudo tee /etc/apt/sources.list.d/Emulators:Wine:Debian.list
+          curl -fsSL https://download.opensuse.org/repositories/Emulators:Wine:Debian/Debian_12/Release.key | gpg --dearmor | sudo tee /etc/apt/trusted.gpg.d/Emulators_Wine_Debian.gpg > /dev/null
+          sudo apt-get update
+          sudo apt-get -yqq --fix-missing \
+          --install-recommends \
+          winehq-devel xvfb curl > /dev/null
+          exit 0
           wget -O /etc/apt/keyrings/winehq-archive.key https://dl.winehq.org/wine-builds/winehq.key
           
           # Use Debian Bookworm repository (hardcoded)
