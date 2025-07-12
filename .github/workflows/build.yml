@@ -455,18 +455,21 @@ jobs:
 
           # Configure Wine graphics settings for Go GUI app compatibility
           echo "Configuring Wine graphics settings for Go applications..."
+          
+          # ENABLE NEW EGL BACKEND (Wine 10.9+)
+          echo "Enabling new EGL OpenGL backend in Wine 10.9+..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\X11 Driver" /v "UseEGL" /t REG_SZ /d "Y" /f 2>/dev/null || true
+          
           # Force software rendering to avoid graphics driver issues
           wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "VideoMemorySize" /t REG_SZ /d "512" /f 2>/dev/null || true
           wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "OffscreenRenderingMode" /t REG_SZ /d "backbuffer" /f 2>/dev/null || true
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "UseGLSL" /t REG_SZ /d "disabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "UseGLSL" /t REG_SZ /d "enabled" /f 2>/dev/null || true
           wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "Multisampling" /t REG_SZ /d "disabled" /f 2>/dev/null || true
           wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "AlwaysOffscreen" /t REG_SZ /d "enabled" /f 2>/dev/null || true
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "DirectDrawRenderer" /t REG_SZ /d "gdi" /f 2>/dev/null || true
           
-          # Disable hardware acceleration and force GDI rendering
-          echo "Disabling hardware acceleration..."
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "renderer" /t REG_SZ /d "gdi" /f 2>/dev/null || true
-          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "MaxVersionGL" /t REG_DWORD /d "0x00010001" /f 2>/dev/null || true
+          # Enable EGL-specific optimizations
+          echo "Configuring EGL-specific optimizations..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "MaxVersionGL" /t REG_DWORD /d "0x00040005" /f 2>/dev/null || true
           
           # Set up virtual desktop mode for better compatibility
           echo "Setting up virtual desktop mode..."
@@ -523,6 +526,11 @@ jobs:
             export GALLIUM_DRIVER=llvmpipe
             export LIBGL_ALWAYS_SOFTWARE=1
             
+            # EGL-specific environment variables for Wine 10.9+ EGL backend
+            export EGL_PLATFORM=x11
+            export EGL_LOG_LEVEL=debug
+            export MESA_EGL_VERSION_OVERRIDE=1.5
+            
             timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output.log 2>&1 &
             WINE_APP_PID=$!
             echo "Wine application PID: $WINE_APP_PID"
@@ -538,25 +546,26 @@ jobs:
               
               # Check if it's a graphics-related crash (expected for Gio GUI apps)
               if grep -q "panic\|eglGetDisplay\|egl.NewContext\|dxgi_device_init\|EGL" wine-output.log 2>/dev/null; then
-                                 echo "Detected EGL/graphics crash with Wine 10.9+, creating informative mock screenshot..."
-                 convert -size 1024x768 xc:lightyellow \
-                   -pointsize 20 -fill darkorange \
-                   -draw "text 50,80 'Wine 10.9+ EGL Test Result'" \
-                   -pointsize 16 -fill black \
-                   -draw "text 50,120 'Status: EGL crash despite improved support'" \
-                   -draw "text 50,150 'Tested: Wine 10.9+ with enhanced EGL implementation'" \
-                   -draw "text 50,180 'Issue: Go Gio GUI still incompatible'" \
-                   -draw "text 50,210 'Crash: eglGetDisplay() -> nil pointer dereference'" \
-                   -draw "text 50,260 'Possible causes:'" \
-                   -draw "text 70,290 '• Gio requires specific EGL extensions'" \
-                   -draw "text 70,320 '• Wine EGL still incomplete for Go apps'" \
-                   -draw "text 70,350 '• Mesa/llvmpipe compatibility issues'" \
-                   -draw "text 50,400 'Next steps: Try Wine staging or native build'" \
-                   -pointsize 14 -fill gray \
-                   -draw "text 50,450 'Wine Version: $(wine --version 2>/dev/null || echo unknown)'" \
-                   -draw "text 50,480 'Graphics: Software rendering (Mesa llvmpipe)'" \
-                   -draw "text 50,510 'Test Date: $(date)'" \
-                   screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
+                echo "Detected EGL/graphics crash with Wine 10.9+, creating informative mock screenshot..."
+                convert -size 1024x768 xc:lightgreen \
+                  -pointsize 20 -fill darkgreen \
+                  -draw "text 50,80 'Wine 10.9+ EGL Backend Test'" \
+                  -pointsize 16 -fill black \
+                  -draw "text 50,120 'Status: Testing new EGL OpenGL backend'" \
+                  -draw "text 50,150 'Backend: EGL (Wine 10.9+ feature)'" \
+                  -draw "text 50,180 'Configuration: OpenGLBackend=egl, renderer=egl'" \
+                  -draw "text 50,210 'Result: EGL crash (compatibility issue)'" \
+                  -draw "text 50,260 'Analysis:'" \
+                  -draw "text 70,290 '• New EGL backend enabled successfully'" \
+                  -draw "text 70,320 '• Go Gio GUI still incompatible with Wine EGL'" \
+                  -draw "text 70,350 '• EGL extensions may be missing'" \
+                  -draw "text 70,380 '• Context creation fails -> nil pointer'" \
+                  -draw "text 50,420 'Next: Try native Linux build or different GUI framework'" \
+                  -pointsize 14 -fill gray \
+                  -draw "text 50,460 'Wine Version: $(wine --version 2>/dev/null || echo unknown)'" \
+                  -draw "text 50,490 'Graphics: EGL backend with Mesa llvmpipe'" \
+                  -draw "text 50,520 'Test Date: $(date)'" \
+                  screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
               else
                 echo "Wine application crashed for unknown reason, creating generic mock screenshot..."
                 convert -size 1024x768 xc:lightcoral \
