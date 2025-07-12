@@ -377,7 +377,7 @@ jobs:
           echo 'deb http://download.opensuse.org/repositories/Emulators:/Wine:/Debian/Debian_12/ /' | tee /etc/apt/sources.list.d/Emulators:Wine:Debian.list
           curl -fsSL https://download.opensuse.org/repositories/Emulators:Wine:Debian/Debian_12/Release.key | gpg --dearmor | tee /etc/apt/trusted.gpg.d/Emulators_Wine_Debian.gpg > /dev/null
           apt-get update
-          apt-get -yqq --fix-missing \
+          apt-get -yqq install --fix-missing \
           --install-recommends \
           winehq-devel xvfb curl > /dev/null
           exit 0
