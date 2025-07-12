@@ -96,7 +96,7 @@ jobs:
         run: |
           echo "Installing chafa for ASCII art conversion..."
           apt-get update -yq
-          apt-get install -yq chafa
+          apt-get install -yq chafa > /dev/null
           
           # Verify installation
           echo "Verifying chafa installation..."
@@ -366,7 +366,7 @@ jobs:
       - name: Install Wine
         run: |
           set -x
-          apt-get -qq install -y cabextract
+          apt-get -qq install -y cabextract > /dev/null
           
           # Install Wine from WineHQ repository (includes bcryptprimitives.dll in 9.0+)
           echo "Installing Wine from WineHQ repository..."
@@ -392,20 +392,9 @@ jobs:
           
           # Try to force install winehq-devel with dependency resolution
           echo "Installing winehq-devel with dependency resolution..."
-          aptitude install -yqqq --fix-missing --install-recommends winehq-devel xvfb curl || {
-            echo "Trying winehq-devel without install-recommends..."
-            apt-get install -yq --fix-missing winehq-devel xvfb curl || {
-              echo "Trying to fix broken packages and install again..."
-              apt-get install -yq -f
-              apt-get install -yq winehq-devel xvfb curl || {
-                echo "Final attempt: trying winehq-staging..."
-                apt-get install -yq winehq-staging xvfb curl || {
-                  echo "ERROR: Failed to install any Wine development version!"
-                  exit 1
-                }
-              }
-            }
-          }
+          apt-get install -yqq --fix-missing \
+          --install-recommends \
+          winehq-devel xvfb curl > /dev/null
       - name: Verify Wine
         run: |
           set -x
