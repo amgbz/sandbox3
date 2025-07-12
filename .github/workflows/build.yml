@@ -391,7 +391,7 @@ jobs:
           
           # Try to force install winehq-devel with dependency resolution
           echo "Installing winehq-devel with dependency resolution..."
-          apt-get install -yq --fix-missing --install-recommends winehq-devel xvfb curl || {
+          apt-get install -yqq --fix-missing --install-recommends winehq-devel xvfb curl || {
             echo "Trying winehq-devel without install-recommends..."
             apt-get install -yq --fix-missing winehq-devel xvfb curl || {
               echo "Trying to fix broken packages and install again..."
@@ -427,7 +427,7 @@ jobs:
           # Verify winetricks installation
           winetricks --version || echo "winetricks version check failed"
 
-      - name: Test Windows GUI Application with Wine
+      - name: Install Winetricks corefonts
         continue-on-error: true
         run: |
           set -x
@@ -445,6 +445,16 @@ jobs:
           # Install minimal Windows components
           echo "Installing basic Windows components..."
           winetricks -q corefonts
+
+      - name: Test Windows GUI Application with Wine
+        continue-on-error: true
+        run: |
+          set -x
+
+          # Set up Wine environment
+          export WINEARCH=win64
+          export WINEPREFIX=/tmp/wine-prefix
+          export DISPLAY=:98
 
           # Configure Wine graphics settings for Go GUI app compatibility
           echo "Configuring Wine graphics settings for Go applications..."
