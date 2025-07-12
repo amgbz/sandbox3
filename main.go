@@ -29,7 +29,7 @@ func main() {
 		// Create new window using correct v0.8.0 API
 		w := new(app.Window)
 		w.Option(app.Title("Hello World - Gio GUI"))
-		w.Option(app.Size(unit.Dp(400), unit.Dp(300)))
+		w.Option(app.Size(unit.Dp(400), unit.Dp(500)))
 
 		err := run(w)
 		if err != nil {
@@ -74,18 +74,18 @@ func drawUI(gtx layout.Context, th *material.Theme) layout.Dimensions {
 				return title.Layout(gtx)
 			}),
 			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
-				return layout.Inset{Top: unit.Dp(20)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
-					subtitle := material.H6(th, "Cross-Platform GUI with Go and Gioui")
-					subtitle.Alignment = text.Middle
-					return subtitle.Layout(gtx)
-				})
-			}),
-			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
 				return layout.Inset{Top: unit.Dp(30)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
 					versionInfo := fmt.Sprintf("Version: %s\nTag: %s\nBuilt: %s\nCommit: %.7s", version, gitTag, buildDate, gitCommit)
 					versionLabel := material.Body2(th, versionInfo)
 					versionLabel.Alignment = text.Middle
 					return versionLabel.Layout(gtx)
+				})
+			}),
+			layout.Rigid(func(gtx layout.Context) layout.Dimensions {
+				return layout.Inset{Top: unit.Dp(20)}.Layout(gtx, func(gtx layout.Context) layout.Dimensions {
+					subtitle := material.H6(th, "Cross-Platform GUI with Go and Gioui")
+					subtitle.Alignment = text.Middle
+					return subtitle.Layout(gtx)
 				})
 			}),
 		)

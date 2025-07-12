@@ -7,8 +7,6 @@ ZIG_CXX := $(ZIG) c++ -w
 
 LIPO := $(CURDIR)/scripts/helpers/lipo.sh
 
-COMMON_GOFLAGS := -tags 'sqlite_json,sqlite_foreign_keys,sqlite_fts5'
-
 LINUXGNU_GOFLAGS := --ldflags '-linkmode external -w' $(COMMON_GOFLAGS)
 LINUXGNU_GLIBC_VERSION := 2.17
 
