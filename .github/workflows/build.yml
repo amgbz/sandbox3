@@ -11,6 +11,7 @@ jobs:
     env:
       # Disable the build version control system to avoid issues with Containers on GitHub Actions
       GOFLAGS: "-buildvcs=false"
+      DEBIAN_FRONTEND: noninteractive
     steps:
       - uses: actions/checkout@v4
       - name: Make shell scripts executable
@@ -20,8 +21,8 @@ jobs:
           set -x
           # Enable multi-arch support for cross-compilation
           dpkg --add-architecture arm64
-          apt-get update -yq
-          apt-get install -yq \
+          apt-get -qq update -y
+          apt-get -qq install -y \
             libxkbcommon-dev \
             libxkbcommon-x11-dev \
             libwayland-dev \
@@ -365,7 +366,7 @@ jobs:
       - name: Install Wine
         run: |
           set -x
-          apt-get install -yq cabextract
+          apt-get -qq install -y cabextract
           
           # Install Wine from WineHQ repository (includes bcryptprimitives.dll in 9.0+)
           echo "Installing Wine from WineHQ repository..."
@@ -380,14 +381,14 @@ jobs:
           wget -NP /etc/apt/sources.list.d/ https://dl.winehq.org/wine-builds/debian/dists/bookworm/winehq-bookworm.sources
           
           # Update package list
-          apt-get update -yq
+          apt-get -qq update -y
           
           # Install Wine development version (10.9+ with improved EGL support) from WineHQ
           echo "Attempting to install Wine development version..."
           
           # Update package cache and fix any broken dependencies first
-          apt-get update -yq
-          apt-get install -yq -f
+          apt-get -qq update -y
+          apt-get -qq install -y -f
           
           # Try to force install winehq-devel with dependency resolution
           echo "Installing winehq-devel with dependency resolution..."
