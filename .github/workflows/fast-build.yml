@@ -33,6 +33,8 @@ jobs:
           echo "Current working directory: $(pwd)"
           echo "Contents of current directory:"
           ls -la
+          echo "Contents of buildcache"
+          ls -laR /opt/buildcache
           
           # GitHub Actions checks out to GITHUB_WORKSPACE by default
           echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
