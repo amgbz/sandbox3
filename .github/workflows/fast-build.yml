@@ -29,6 +29,14 @@ jobs:
           # Ensure build cache directory exists
           mkdir -p /opt/buildcache
           
+          # Show current working directory and contents
+          echo "Current working directory: $(pwd)"
+          echo "Contents of current directory:"
+          ls -la
+          
+          # GitHub Actions checks out to GITHUB_WORKSPACE by default
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          
           # Sync current source to build cache directory for incremental build
           echo "Syncing source to build cache..."
           rsync -av --delete \
@@ -39,7 +47,7 @@ jobs:
             --exclude='wine-*' \
             --exclude='ascii-*' \
             --exclude='ocr-*' \
-            /workspace/ /opt/buildcache/
+            ./ /opt/buildcache/
           
           # Show what's in the build cache
           echo "Build cache contents:"
@@ -83,15 +91,20 @@ jobs:
           # Build all targets
           make all
           
-          # Copy built artifacts back to workspace
-          echo "Copying artifacts back to workspace..."
-          cp -r dist/ /workspace/ || echo "No dist directory to copy"
+          # Copy built artifacts back to checkout directory
+          echo "Copying artifacts back to checkout directory..."
+          if [ -d "dist" ]; then
+            cp -r dist/ /github/workspace/ || cp -r dist/ "$GITHUB_WORKSPACE"/ || cp -r dist/ ../
+            echo "Artifacts copied successfully"
+          else
+            echo "No dist directory found to copy"
+          fi
       - name: Test GUI Application
         run: |
           set -x
           
-          # Make sure we're in the workspace directory
-          cd /workspace
+          # Make sure we're in the correct directory
+          echo "Working in directory: $(pwd)"
           
           # Verify built artifacts exist
           echo "Checking for built artifacts..."
@@ -352,8 +365,8 @@ jobs:
         run: |
           set -x
 
-          # Make sure we're in the workspace directory
-          cd /workspace
+          # Make sure we're in the correct directory
+          echo "Working in directory: $(pwd)"
           
           # Verify Windows executable exists
           echo "Checking for Windows executable..."
