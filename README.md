@@ -1,5 +1,5 @@
 # cross-cgo
-
+.
 This is a simple example of how to cross-compile a Go program that uses CGO.
 
 ## Overview
