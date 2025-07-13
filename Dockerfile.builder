@@ -121,22 +121,8 @@ RUN wine --version && \
     chafa --version && \
     go version
 
-# Set up build cache directory
-RUN mkdir -p /opt/buildcache
-
-# Copy source code for initial build cache
-COPY . /opt/buildcache/
-
-# Initial build to populate build cache
-WORKDIR /opt/buildcache
-RUN set -x && \
-    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
-    find . -name "*.sh" -type f -exec chmod +x {} \; && \
-    go mod download && \
-    go mod vendor && \
-    make all || echo "Initial build failed, cache partially populated"
-
-# Clean up artifacts but keep cache
-RUN rm -rf dist/ || true
+# Set up build cache directory for fast incremental builds
+RUN mkdir -p /opt/buildcache && \
+    echo "Build cache directory prepared at /opt/buildcache"
 
 WORKDIR /workspace 
