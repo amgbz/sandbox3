@@ -121,8 +121,31 @@ RUN wine --version && \
     chafa --version && \
     go version
 
-# Set up build cache directory for fast incremental builds
-RUN mkdir -p /opt/buildcache && \
-    echo "Build cache directory prepared at /opt/buildcache"
+# Set up build cache directory and copy source
+RUN mkdir -p /opt/buildcache
+COPY . /opt/buildcache/
+
+# Initial build to populate build cache
+WORKDIR /opt/buildcache
+RUN set -x && \
+    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
+    echo "Contents of build cache directory:" && \
+    ls -la && \
+    find . -name "*.sh" -type f -exec chmod +x {} \; && \
+    if [ -f "go.mod" ]; then \
+        echo "Found go.mod, building initial cache..." && \
+        go mod download && \
+        go mod vendor && \
+        echo "Running initial build..." && \
+        make all && \
+        echo "Initial build completed successfully" && \
+        ls -la dist/ || echo "No dist directory created"; \
+    else \
+        echo "No go.mod found in source, skipping build"; \
+    fi
+
+# Clean up build artifacts but keep cache (vendor, downloaded modules)
+RUN rm -rf dist/ || true && \
+    echo "Build artifacts cleaned, cache preserved"
 
 WORKDIR /workspace 

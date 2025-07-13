@@ -38,16 +38,21 @@ jobs:
           echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
           
           # Sync current source to build cache directory for incremental build
-          echo "Syncing source to build cache..."
-          rsync -av --delete \
+          echo "Syncing source to build cache (preserving pre-built cache)..."
+          rsync -av \
             --exclude='.git/' \
             --exclude='dist/' \
+            --exclude='vendor/' \
             --exclude='*.log' \
             --exclude='screenshot*' \
             --exclude='wine-*' \
             --exclude='ascii-*' \
             --exclude='ocr-*' \
             ./ /opt/buildcache/
+          
+          echo "Sync completed. Cache status:"
+          echo "- Vendor directory preserved: $([ -d /opt/buildcache/vendor ] && echo 'YES' || echo 'NO')"
+          echo "- Go.mod synced: $([ -f /opt/buildcache/go.mod ] && echo 'YES' || echo 'NO')"
           
           # Show what's in the build cache
           echo "Build cache contents:"
@@ -79,13 +84,18 @@ jobs:
           # Show Go environment
           go env
           
-          # Use cached vendor if available, otherwise download
-          if [ ! -d "vendor" ]; then
-            echo "Downloading Go modules..."
+          # Check for pre-existing cache from container build
+          if [ -d "vendor" ] && [ -d "$GOMODCACHE" ]; then
+            echo "✓ Using pre-built Go module cache from container"
+            echo "Vendor directory size: $(du -sh vendor 2>/dev/null || echo 'unknown')"
+            echo "Module cache size: $(du -sh $GOMODCACHE 2>/dev/null || echo 'unknown')"
+          elif [ -d "vendor" ]; then
+            echo "✓ Using cached vendor directory"
+            go mod download  # Just update module cache
+          else
+            echo "Building Go module cache from scratch..."
             go mod download
             go mod vendor
-          else
-            echo "Using cached Go modules..."
           fi
           
           # Build all targets
