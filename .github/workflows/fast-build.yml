@@ -16,24 +16,91 @@ jobs:
       credentials:
         username: ${{ github.actor }}
         password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root
     env:
       # Disable the build version control system to avoid issues with Containers on GitHub Actions
       GOFLAGS: "-buildvcs=false"
       DEBIAN_FRONTEND: noninteractive
     steps:
       - uses: actions/checkout@v4
-      - name: Make shell scripts executable
-        run: find . -name "*.sh" -type f -exec chmod +x {} \;
-      - name: Build
+      - name: Sync source to build cache
         run: |
           set -x
+          # Ensure build cache directory exists
+          mkdir -p /opt/buildcache
+          
+          # Sync current source to build cache directory for incremental build
+          echo "Syncing source to build cache..."
+          rsync -av --delete \
+            --exclude='.git/' \
+            --exclude='dist/' \
+            --exclude='*.log' \
+            --exclude='screenshot*' \
+            --exclude='wine-*' \
+            --exclude='ascii-*' \
+            --exclude='ocr-*' \
+            /workspace/ /opt/buildcache/
+          
+          # Show what's in the build cache
+          echo "Build cache contents:"
+          ls -la /opt/buildcache/
+          
+          # Check if Go module cache exists
+          if [ -d "/opt/buildcache/vendor" ]; then
+            echo "✓ Go vendor cache found"
+          else
+            echo "⚠ Go vendor cache not found"
+          fi
+          
+          # Check if Go module file exists
+          if [ -f "/opt/buildcache/go.mod" ]; then
+            echo "✓ Go module file found"
+          else
+            echo "⚠ Go module file not found"
+          fi
+          
+      - name: Build from cache
+        run: |
+          set -x
+          cd /opt/buildcache
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          
+          # Make scripts executable
+          find . -name "*.sh" -type f -exec chmod +x {} \;
+          
+          # Show Go environment
           go env
-          go mod vendor
+          
+          # Use cached vendor if available, otherwise download
+          if [ ! -d "vendor" ]; then
+            echo "Downloading Go modules..."
+            go mod download
+            go mod vendor
+          else
+            echo "Using cached Go modules..."
+          fi
+          
+          # Build all targets
           make all
+          
+          # Copy built artifacts back to workspace
+          echo "Copying artifacts back to workspace..."
+          cp -r dist/ /workspace/ || echo "No dist directory to copy"
       - name: Test GUI Application
         run: |
           set -x
+          
+          # Make sure we're in the workspace directory
+          cd /workspace
+          
+          # Verify built artifacts exist
+          echo "Checking for built artifacts..."
+          ls -la dist/ || echo "No dist directory found"
+          if [ -f "dist/linuxgnu-amd64/demo" ]; then
+            echo "✓ Linux GUI demo found"
+          else
+            echo "⚠ Linux GUI demo not found"
+          fi
           
           # Set up X11 environment (disable Wayland)
           export DISPLAY=:99
@@ -284,6 +351,17 @@ jobs:
         continue-on-error: true
         run: |
           set -x
+
+          # Make sure we're in the workspace directory
+          cd /workspace
+          
+          # Verify Windows executable exists
+          echo "Checking for Windows executable..."
+          if [ -f "dist/windows-amd64/demo.exe" ]; then
+            echo "✓ Windows GUI demo found"
+          else
+            echo "⚠ Windows GUI demo not found"
+          fi
 
           # Set up Wine environment
           export WINEARCH=win64
