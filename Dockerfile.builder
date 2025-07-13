@@ -54,6 +54,7 @@ RUN set -x && \
     file \
     cabextract \
     chafa \
+    rsync \
     libxkbcommon-dev:arm64 \
     libxkbcommon-x11-dev:arm64 \
     libwayland-dev:arm64 \
