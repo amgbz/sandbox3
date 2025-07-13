@@ -101,7 +101,7 @@ RUN set -x && \
 # Install Zig for cross-compilation
 RUN set -x && \
     echo "Installing Zig for cross-compilation..." && \
-    ZIG_VERSION="0.13.0" && \
+    ZIG_VERSION="0.14.1" && \
     curl -fsSL "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz" -o zig.tar.xz && \
     tar -xf zig.tar.xz && \
     mv zig-linux-x86_64-${ZIG_VERSION} /opt/zig && \
