@@ -105,12 +105,63 @@ jobs:
           fi
           
           # Build all targets
+          echo "Starting build process..."
+          echo "Build targets: make all"
           make all
+          
+          # Check what was built
+          echo "Build completed. Checking dist directory..."
+          if [ -d "dist" ]; then
+            echo "Contents of dist directory:"
+            find dist -type f -exec ls -la {} \;
+            echo ""
+            echo "Checking for Windows executable specifically..."
+            if [ -f "dist/windows-amd64/demo.exe" ]; then
+              echo "✓ Windows AMD64 executable found: $(ls -la dist/windows-amd64/demo.exe)"
+              file dist/windows-amd64/demo.exe || echo "file command failed"
+            else
+              echo "⚠ Windows AMD64 executable NOT found"
+            fi
+            
+            if [ -f "dist/linuxgnu-amd64/demo" ]; then
+              echo "✓ Linux AMD64 executable found: $(ls -la dist/linuxgnu-amd64/demo)"
+            else
+              echo "⚠ Linux AMD64 executable NOT found"
+            fi
+          else
+            echo "❌ No dist directory found after build"
+          fi
           
           # Copy built artifacts back to checkout directory
           echo "Copying artifacts back to checkout directory..."
           if [ -d "dist" ]; then
-            cp -r dist/ /github/workspace/ || cp -r dist/ "$GITHUB_WORKSPACE"/ || cp -r dist/ ../
+            # Show debug information
+            echo "Current working directory: $(pwd)"
+            echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+            echo "Available directories:"
+            ls -la /
+            
+            # Try multiple paths to find the correct checkout directory
+            if [ -n "$GITHUB_WORKSPACE" ] && [ -d "$GITHUB_WORKSPACE" ]; then
+              echo "Using GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+              cp -r dist/ "$GITHUB_WORKSPACE/"
+            elif [ -d "/github/workspace" ]; then
+              echo "Using /github/workspace"
+              cp -r dist/ /github/workspace/
+            elif [ -d "/__w/sandbox3/sandbox3" ]; then
+              echo "Using /__w/sandbox3/sandbox3"
+              cp -r dist/ /__w/sandbox3/sandbox3/
+            else
+              echo "Trying to find checkout directory..."
+              # Look for the checkout directory with our source files
+              for dir in /github/workspace /__w/*/sandbox3 /__w/*/*; do
+                if [ -d "$dir" ] && [ -f "$dir/go.mod" ]; then
+                  echo "Found checkout directory: $dir"
+                  cp -r dist/ "$dir/"
+                  break
+                fi
+              done
+            fi
             echo "Artifacts copied successfully"
           else
             echo "No dist directory found to copy"
@@ -122,9 +173,20 @@ jobs:
           # Make sure we're in the correct directory
           echo "Working in directory: $(pwd)"
           
+          # Debug: Check directory contents
+          echo "Directory contents:"
+          ls -la
+          
           # Verify built artifacts exist
           echo "Checking for built artifacts..."
-          ls -la dist/ || echo "No dist directory found"
+          if [ -d "dist" ]; then
+            echo "✓ dist directory found"
+            echo "Contents of dist directory:"
+            find dist -type f -exec ls -la {} \;
+          else
+            echo "❌ No dist directory found"
+          fi
+          
           if [ -f "dist/linuxgnu-amd64/demo" ]; then
             echo "✓ Linux GUI demo found"
           else
@@ -384,8 +446,23 @@ jobs:
           # Make sure we're in the correct directory
           echo "Working in directory: $(pwd)"
           
+          # Debug: Check directory contents
+          echo "Directory contents:"
+          ls -la
+          
           # Verify Windows executable exists
           echo "Checking for Windows executable..."
+          if [ -d "dist" ]; then
+            echo "✓ dist directory found"
+            echo "Contents of dist directory:"
+            find dist -type f -exec ls -la {} \;
+            echo ""
+            echo "Specifically checking for Windows builds..."
+            ls -la dist/windows-* 2>/dev/null || echo "No Windows directories found"
+          else
+            echo "❌ No dist directory found"
+          fi
+          
           if [ -f "dist/windows-amd64/demo.exe" ]; then
             echo "✓ Windows GUI demo found"
           else
