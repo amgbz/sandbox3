@@ -77,6 +77,10 @@ jobs:
           set -x
           cd /opt/buildcache
           export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          export ALLOW_OUTSIDE_DOCKER=1
+          export IN_DOCKER=1
+          export ZIG_LOCAL_CACHE_DIR=/tmp/zig-cache
+          export ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache
           
           # Make scripts executable
           find . -name "*.sh" -type f -exec chmod +x {} \;

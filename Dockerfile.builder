@@ -55,6 +55,7 @@ RUN set -x && \
     cabextract \
     chafa \
     rsync \
+    xz-utils \
     libxkbcommon-dev:arm64 \
     libxkbcommon-x11-dev:arm64 \
     libwayland-dev:arm64 \
@@ -97,6 +98,17 @@ RUN set -x && \
         apt-get install -yqq --fix-missing --install-recommends winehq-devel xvfb curl > /dev/null; \
     }
 
+# Install Zig for cross-compilation
+RUN set -x && \
+    echo "Installing Zig for cross-compilation..." && \
+    ZIG_VERSION="0.13.0" && \
+    curl -fsSL "https://ziglang.org/download/${ZIG_VERSION}/zig-linux-x86_64-${ZIG_VERSION}.tar.xz" -o zig.tar.xz && \
+    tar -xf zig.tar.xz && \
+    mv zig-linux-x86_64-${ZIG_VERSION} /opt/zig && \
+    ln -s /opt/zig/zig /usr/local/bin/zig && \
+    rm -f zig.tar.xz && \
+    zig version
+
 # Install winetricks
 RUN curl -o /usr/local/bin/winetricks https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks && \
     chmod +x /usr/local/bin/winetricks
@@ -112,8 +124,12 @@ RUN export WINEARCH=win64 && \
     winetricks -q corefonts 2>/dev/null || echo "corefonts installation failed" && \
     pkill Xvfb || true
 
-# Set up PKG_CONFIG_PATH for cross-compilation
+# Set up environment variables for cross-compilation and build tools
 ENV PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+ENV ALLOW_OUTSIDE_DOCKER=1
+ENV IN_DOCKER=1
+ENV ZIG_LOCAL_CACHE_DIR=/tmp/zig-cache
+ENV ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache
 
 # Verify installations
 RUN wine --version && \
@@ -129,6 +145,10 @@ COPY . /opt/buildcache/
 WORKDIR /opt/buildcache
 RUN set -x && \
     export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig && \
+    export ALLOW_OUTSIDE_DOCKER=1 && \
+    export IN_DOCKER=1 && \
+    export ZIG_LOCAL_CACHE_DIR=/tmp/zig-cache && \
+    export ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache && \
     echo "Contents of build cache directory:" && \
     ls -la && \
     find . -name "*.sh" -type f -exec chmod +x {} \; && \
