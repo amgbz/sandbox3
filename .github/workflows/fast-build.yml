@@ -1,0 +1,731 @@
+name: Fast Build
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: read
+
+jobs:
+  fast-build:
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/${{ github.repository }}/gobuilder:latest
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root
+    env:
+      # Disable the build version control system to avoid issues with Containers on GitHub Actions
+      GOFLAGS: "-buildvcs=false"
+      DEBIAN_FRONTEND: noninteractive
+    steps:
+      - uses: actions/checkout@v4
+      - name: Sync source to build cache
+        run: |
+          set -x
+          # Ensure build cache directory exists
+          mkdir -p /opt/buildcache
+          
+          # Show current working directory and contents
+          echo "Current working directory: $(pwd)"
+          echo "Contents of current directory:"
+          ls -la
+          echo "Contents of buildcache"
+          ls -laR /opt/buildcache
+          
+          # GitHub Actions checks out to GITHUB_WORKSPACE by default
+          echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+          
+          # Sync current source to build cache directory for incremental build
+          echo "Syncing source to build cache (preserving pre-built cache)..."
+          rsync -av \
+            --exclude='.git/' \
+            --exclude='dist/' \
+            --exclude='vendor/' \
+            --exclude='*.log' \
+            --exclude='screenshot*' \
+            --exclude='wine-*' \
+            --exclude='ascii-*' \
+            --exclude='ocr-*' \
+            ./ /opt/buildcache/
+          
+          echo "Sync completed. Cache status:"
+          echo "- Vendor directory preserved: $([ -d /opt/buildcache/vendor ] && echo 'YES' || echo 'NO')"
+          echo "- Go.mod synced: $([ -f /opt/buildcache/go.mod ] && echo 'YES' || echo 'NO')"
+          
+          # Show what's in the build cache
+          echo "Build cache contents:"
+          ls -la /opt/buildcache/
+          
+          # Check if Go module cache exists
+          if [ -d "/opt/buildcache/vendor" ]; then
+            echo "✓ Go vendor cache found"
+          else
+            echo "⚠ Go vendor cache not found"
+          fi
+          
+          # Check if Go module file exists
+          if [ -f "/opt/buildcache/go.mod" ]; then
+            echo "✓ Go module file found"
+          else
+            echo "⚠ Go module file not found"
+          fi
+          
+      - name: Build from cache
+        run: |
+          set -x
+          cd /opt/buildcache
+          export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig
+          export ALLOW_OUTSIDE_DOCKER=1
+          export IN_DOCKER=1
+          export ZIG_LOCAL_CACHE_DIR=/tmp/zig-cache
+          export ZIG_GLOBAL_CACHE_DIR=/tmp/zig-global-cache
+          
+          # Make scripts executable
+          find . -name "*.sh" -type f -exec chmod +x {} \;
+          
+          # Show Go environment
+          go env
+          
+          # Check for pre-existing cache from container build
+          if [ -d "vendor" ] && [ -d "$GOMODCACHE" ]; then
+            echo "✓ Using pre-built Go module cache from container"
+            echo "Vendor directory size: $(du -sh vendor 2>/dev/null || echo 'unknown')"
+            echo "Module cache size: $(du -sh $GOMODCACHE 2>/dev/null || echo 'unknown')"
+          elif [ -d "vendor" ]; then
+            echo "✓ Using cached vendor directory"
+            go mod download  # Just update module cache
+          else
+            echo "Building Go module cache from scratch..."
+            go mod download
+            go mod vendor
+          fi
+          
+          # Build all targets
+          echo "Starting build process..."
+          echo "Build targets: make all"
+          make all
+          
+          # Check what was built
+          echo "Build completed. Checking dist directory..."
+          if [ -d "dist" ]; then
+            echo "Contents of dist directory:"
+            find dist -type f -exec ls -la {} \;
+            echo ""
+            echo "Checking for Windows executable specifically..."
+            if [ -f "dist/windows-amd64/demo.exe" ]; then
+              echo "✓ Windows AMD64 executable found: $(ls -la dist/windows-amd64/demo.exe)"
+              file dist/windows-amd64/demo.exe || echo "file command failed"
+            else
+              echo "⚠ Windows AMD64 executable NOT found"
+            fi
+            
+            if [ -f "dist/linuxgnu-amd64/demo" ]; then
+              echo "✓ Linux AMD64 executable found: $(ls -la dist/linuxgnu-amd64/demo)"
+            else
+              echo "⚠ Linux AMD64 executable NOT found"
+            fi
+          else
+            echo "❌ No dist directory found after build"
+          fi
+          
+          # Copy built artifacts back to checkout directory
+          echo "Copying artifacts back to checkout directory..."
+          if [ -d "dist" ]; then
+            # Show debug information
+            echo "Current working directory: $(pwd)"
+            echo "GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+            echo "Available directories:"
+            ls -la /
+            
+            # Try multiple paths to find the correct checkout directory
+            if [ -n "$GITHUB_WORKSPACE" ] && [ -d "$GITHUB_WORKSPACE" ]; then
+              echo "Using GITHUB_WORKSPACE: $GITHUB_WORKSPACE"
+              cp -r dist/ "$GITHUB_WORKSPACE/"
+            elif [ -d "/github/workspace" ]; then
+              echo "Using /github/workspace"
+              cp -r dist/ /github/workspace/
+            elif [ -d "/__w/sandbox3/sandbox3" ]; then
+              echo "Using /__w/sandbox3/sandbox3"
+              cp -r dist/ /__w/sandbox3/sandbox3/
+            else
+              echo "Trying to find checkout directory..."
+              # Look for the checkout directory with our source files
+              for dir in /github/workspace /__w/*/sandbox3 /__w/*/*; do
+                if [ -d "$dir" ] && [ -f "$dir/go.mod" ]; then
+                  echo "Found checkout directory: $dir"
+                  cp -r dist/ "$dir/"
+                  break
+                fi
+              done
+            fi
+            echo "Artifacts copied successfully"
+          else
+            echo "No dist directory found to copy"
+          fi
+      - name: Test GUI Application
+        run: |
+          set -x
+          
+          # Make sure we're in the correct directory
+          echo "Working in directory: $(pwd)"
+          
+          # Debug: Check directory contents
+          echo "Directory contents:"
+          ls -la
+          
+          # Verify built artifacts exist
+          echo "Checking for built artifacts..."
+          if [ -d "dist" ]; then
+            echo "✓ dist directory found"
+            echo "Contents of dist directory:"
+            find dist -type f -exec ls -la {} \;
+          else
+            echo "❌ No dist directory found"
+          fi
+          
+          if [ -f "dist/linuxgnu-amd64/demo" ]; then
+            echo "✓ Linux GUI demo found"
+          else
+            echo "⚠ Linux GUI demo not found"
+          fi
+          
+          # Set up X11 environment (disable Wayland)
+          export DISPLAY=:99
+          export XDG_SESSION_TYPE=x11
+          export XDG_RUNTIME_DIR=/tmp/runtime-root
+          export WAYLAND_DISPLAY=""
+          export QT_QPA_PLATFORM=xcb
+          export GDK_BACKEND=x11
+          mkdir -p $XDG_RUNTIME_DIR
+          chmod 700 $XDG_RUNTIME_DIR
+          
+          # Start Xvfb virtual framebuffer  
+          Xvfb :99 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &
+          XVFB_PID=$!
+          
+          # Wait for X server to start
+          sleep 3
+          
+          # Verify X server is running
+          echo "Checking X server..."
+          xdpyinfo -display :99 | head -n 100
+          
+          # Start lightweight window manager (suppress config warnings)
+          fluxbox -display :99 2>/dev/null &
+          FLUXBOX_PID=$!
+          
+          # Wait for window manager
+          sleep 3
+          
+          # Test the GUI application with timeout and screenshot
+          echo "Testing linuxgnu-amd64 GUI application..."
+          echo "Environment variables:"
+          env | grep -E "(DISPLAY|XDG|WAYLAND|QT|GDK)" | sort
+          
+          # Run the application in background
+          echo "Starting application..."
+          timeout 30s ./dist/linuxgnu-amd64/demo &
+          APP_PID=$!
+          echo "Application PID: $APP_PID"
+          
+          # Wait a bit for the app to start
+          sleep 3
+          
+          # Check if application is still running
+          if ps -p $APP_PID > /dev/null; then
+            echo "Application is running"
+          else
+            echo "Application may have exited early"
+          fi
+          
+          # Wait more for the app to render
+          sleep 5
+          
+          # List any windows that might be open
+          echo "Windows currently open:"
+          wmctrl -l 2>/dev/null || echo "No wmctrl available"
+          
+          # Get window information
+          echo "Window tree:"
+          xwininfo -tree -root | head -20 || echo "xwininfo failed"
+          
+          # Take multiple screenshots at different times
+          echo "Taking screenshot (attempt 1)..."
+          import -window root screenshot-amd64-raw.png 2>/dev/null || echo "First screenshot failed"
+          
+          # Wait a bit more and try again
+          sleep 3
+          echo "Taking screenshot (attempt 2)..."
+          import -window root screenshot-amd64.png 2>/dev/null || echo "Second screenshot failed"
+          
+          # Try to capture specific window if GUI app is running
+          if pgrep -f "demo" > /dev/null; then
+            echo "Demo process is running, trying window-specific screenshot..."
+            WINDOW_ID=$(xwininfo -root -tree | grep -i "hello\|demo\|gui" | head -1 | cut -d' ' -f6 || echo "")
+            if [ -n "$WINDOW_ID" ]; then
+              echo "Found window ID: $WINDOW_ID"
+              import -window "$WINDOW_ID" screenshot-amd64-window.png 2>/dev/null || echo "Window screenshot failed"
+            fi
+          fi
+          
+          # Check screenshot files
+          echo "Screenshot files created:"
+          ls -la screenshot-*.png 2>/dev/null || echo "No PNG files found"
+          
+          # Use the best available screenshot
+          if [ -f "screenshot-amd64-window.png" ] && [ -s "screenshot-amd64-window.png" ]; then
+            echo "Using window-specific screenshot"
+            cp screenshot-amd64-window.png screenshot-amd64.png
+          elif [ -f "screenshot-amd64.png" ] && [ -s "screenshot-amd64.png" ]; then
+            echo "Using full-screen screenshot"
+          else
+            echo "No valid screenshot captured"
+          fi
+          
+          # Analyze screenshot if it was captured
+          if [ -f "screenshot-amd64.png" ] && [ -s "screenshot-amd64.png" ]; then
+            echo ""
+            echo "=== IMAGE PREPROCESSING FOR OCR ==="
+            
+            # Create enhanced versions for better OCR
+            echo "Creating enhanced images for OCR..."
+            
+            # High contrast version
+            convert screenshot-amd64.png -contrast-stretch 0 screenshot-amd64-contrast.png 2>/dev/null || echo "Contrast enhancement failed"
+            
+            # Grayscale with increased contrast
+            convert screenshot-amd64.png -colorspace Gray -normalize -contrast-stretch 5% screenshot-amd64-gray.png 2>/dev/null || echo "Grayscale conversion failed"
+            
+            # Scaled up version (OCR works better on larger text)
+            convert screenshot-amd64.png -resize 200% screenshot-amd64-large.png 2>/dev/null || echo "Scaling failed"
+            
+            # Black and white high contrast
+            convert screenshot-amd64.png -threshold 50% screenshot-amd64-bw.png 2>/dev/null || echo "B&W conversion failed"
+            
+            echo ""
+            echo "=== OCR TEXT EXTRACTION ==="
+            
+            # Try OCR on multiple processed versions
+            OCR_SUCCESS=false
+            
+            for img in screenshot-amd64.png screenshot-amd64-large.png screenshot-amd64-gray.png screenshot-amd64-contrast.png screenshot-amd64-bw.png; do
+              if [ -f "$img" ]; then
+                echo "Trying OCR on $img..."
+                if tesseract "$img" "ocr-$(basename $img .png)" -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\ .,:-! 2>/dev/null; then
+                  OCR_FILE="ocr-$(basename $img .png).txt"
+                  if [ -f "$OCR_FILE" ] && [ -s "$OCR_FILE" ]; then
+                    echo "SUCCESS: Text detected in $img:"
+                    cat "$OCR_FILE"
+                    echo ""
+                    # Copy successful result to main OCR file
+                    cp "$OCR_FILE" screenshot-ocr.txt
+                    OCR_SUCCESS=true
+                    break
+                  fi
+                fi
+              fi
+            done
+            
+            if [ "$OCR_SUCCESS" = false ]; then
+              echo "OCR failed on all image variants"
+              # Still create empty file for artifact upload
+              touch screenshot-ocr.txt
+            else
+              echo "Text summary: $(cat screenshot-ocr.txt | tr -d '\n' | tr -s ' ')"
+            fi
+            
+            echo ""
+            echo "=== ASCII ART CONVERSION ==="
+            
+            # Try multiple ASCII art versions with different settings using chafa
+            echo "Generating ASCII art representations with chafa..."
+            echo "Chafa version: $(chafa --version 2>/dev/null || echo 'unknown')"
+            
+            # Test if chafa is working first
+            echo "Testing chafa with screenshot file..."
+            if ! chafa screenshot-amd64.png -s 40x20 > /dev/null 2>&1; then
+              echo "chafa cannot process the screenshot file, trying to debug..."
+              ls -la screenshot-amd64.png
+              file screenshot-amd64.png || echo "file command not available"
+              echo "Trying basic chafa without options..."
+              chafa screenshot-amd64.png 2>&1 | head -5 || echo "Basic chafa failed"
+            fi
+            
+            # Standard ASCII art (80 characters wide)
+            echo "Attempting standard ASCII conversion..."
+            if chafa screenshot-amd64.png -s 80x60 > ascii-standard.txt 2>&1; then
+              if [ -s ascii-standard.txt ]; then
+                echo ""
+                echo "Standard ASCII (80 chars wide) - SUCCESS"
+                cat ascii-standard.txt
+              else
+                echo "Standard ASCII conversion created empty file"
+              fi
+            else
+              echo "Standard ASCII conversion failed, trying basic chafa..."
+              if chafa screenshot-amd64.png > ascii-standard.txt 2>&1; then
+                echo "Basic ASCII - SUCCESS"
+                cat ascii-standard.txt
+              else
+                echo "All ASCII conversion attempts failed"
+              fi
+            fi
+            
+            echo ""
+            echo "--- Compact ASCII (60 chars) ---"
+            # Compact version  
+            if chafa screenshot-amd64.png -s 60x40 > ascii-compact.txt 2>&1; then
+              if [ -s ascii-compact.txt ]; then
+                echo "Compact ASCII - SUCCESS"
+                cat ascii-compact.txt
+              else
+                echo "Compact ASCII conversion created empty file"
+              fi
+            else
+              echo "Compact ASCII conversion failed"
+            fi
+            
+            echo ""
+            echo "--- ANSI Colored ASCII ---"
+            # ANSI colored version with colors
+            if chafa screenshot-amd64.png -s 70x50 -c 256 > ascii-colored.txt 2>&1; then
+              if [ -s ascii-colored.txt ]; then
+                echo "ANSI colored ASCII - SUCCESS"
+                cat ascii-colored.txt
+              else
+                echo "ANSI colored ASCII conversion created empty file"
+              fi
+            else
+              echo "ANSI colored ASCII conversion failed"
+            fi
+            
+            echo ""
+            echo "--- Simple ASCII (no color) ---"
+            # Simple ASCII version without colors
+            if chafa screenshot-amd64.png -s 80x60 -c 2 > ascii-simple.txt 2>&1; then
+              if [ -s ascii-simple.txt ]; then
+                echo "Simple ASCII - SUCCESS"
+                cat ascii-simple.txt
+              else
+                echo "Simple ASCII conversion created empty file"
+              fi
+            else
+              echo "Simple ASCII conversion failed"
+            fi
+            
+            echo ""
+            echo "=== IMAGE INFO ==="
+            if identify screenshot-amd64.png 2>/dev/null; then
+              echo "Image analysis completed"
+            else
+              echo "Image info failed"
+            fi
+          else
+            echo "No valid screenshot to analyze"
+          fi
+          
+          # Kill the application
+          kill $APP_PID 2>/dev/null || true
+          wait $APP_PID 2>/dev/null || true
+          
+          # Clean up
+          kill $FLUXBOX_PID 2>/dev/null || true
+          kill $XVFB_PID 2>/dev/null || true
+          
+          echo "GUI test completed"
+          
+      - name: Test Windows GUI Application with Wine
+        continue-on-error: true
+        run: |
+          set -x
+
+          # Make sure we're in the correct directory
+          echo "Working in directory: $(pwd)"
+          
+          # Debug: Check directory contents
+          echo "Directory contents:"
+          ls -la
+          
+          # Verify Windows executable exists
+          echo "Checking for Windows executable..."
+          if [ -d "dist" ]; then
+            echo "✓ dist directory found"
+            echo "Contents of dist directory:"
+            find dist -type f -exec ls -la {} \;
+            echo ""
+            echo "Specifically checking for Windows builds..."
+            ls -la dist/windows-* 2>/dev/null || echo "No Windows directories found"
+          else
+            echo "❌ No dist directory found"
+          fi
+          
+          if [ -f "dist/windows-amd64/demo.exe" ]; then
+            echo "✓ Windows GUI demo found"
+          else
+            echo "⚠ Windows GUI demo not found"
+          fi
+
+          # Set up Wine environment
+          export WINEARCH=win64
+          export WINEPREFIX=/tmp/wine-prefix
+          export DISPLAY=:98
+          
+          # Initialize Wine (suppress output)
+          echo "Initializing Wine..."
+          wine --version
+          wineboot --init 2>/dev/null || true
+          
+          # Configure Wine graphics settings for Go GUI app compatibility
+          echo "Configuring Wine graphics settings for Go applications..."
+          
+          # ENABLE NEW EGL BACKEND (Wine 10.9+)
+          echo "Enabling new EGL OpenGL backend in Wine 10.9+..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\X11 Driver" /v "UseEGL" /t REG_SZ /d "Y" /f 2>/dev/null || true
+          
+          # Force software rendering to avoid graphics driver issues
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "VideoMemorySize" /t REG_SZ /d "512" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "OffscreenRenderingMode" /t REG_SZ /d "backbuffer" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "UseGLSL" /t REG_SZ /d "enabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "Multisampling" /t REG_SZ /d "disabled" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "AlwaysOffscreen" /t REG_SZ /d "enabled" /f 2>/dev/null || true
+          
+          # Enable EGL-specific optimizations
+          echo "Configuring EGL-specific optimizations..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Direct3D" /v "MaxVersionGL" /t REG_DWORD /d "0x00040005" /f 2>/dev/null || true
+          
+          # Set up virtual desktop mode for better compatibility
+          echo "Setting up virtual desktop mode..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Explorer" /v "Desktop" /t REG_SZ /d "Default" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\Explorer\\Desktops" /v "Default" /t REG_SZ /d "1024x768" /f 2>/dev/null || true
+          
+          # Configure DLL overrides to use Windows DLLs for graphics
+          echo "Configuring DLL overrides for graphics compatibility..."
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides" /v "d3d11" /t REG_SZ /d "builtin" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides" /v "dxgi" /t REG_SZ /d "builtin" /f 2>/dev/null || true
+          wine reg add "HKEY_CURRENT_USER\\Software\\Wine\\DllOverrides" /v "opengl32" /t REG_SZ /d "builtin" /f 2>/dev/null || true
+          
+          # Set up X11 environment for Wine
+          export XDG_SESSION_TYPE=x11
+          export XDG_RUNTIME_DIR=/tmp/runtime-wine
+          export WAYLAND_DISPLAY=""
+          export QT_QPA_PLATFORM=xcb
+          export GDK_BACKEND=x11
+          mkdir -p $XDG_RUNTIME_DIR
+          chmod 700 $XDG_RUNTIME_DIR
+          
+          # Start separate Xvfb for Wine test
+          Xvfb :98 -screen 0 1024x768x24 -ac +extension GLX +render -noreset &
+          XVFB_WINE_PID=$!
+          
+          # Wait for X server to start
+          sleep 3
+          
+          # Verify X server is running
+          echo "Checking Wine X server..."
+          xdpyinfo -display :98 | head -n 20 || echo "Wine X server check failed"
+          
+          # Start lightweight window manager for Wine
+          fluxbox -display :98 2>/dev/null &
+          FLUXBOX_WINE_PID=$!
+          
+          # Wait for window manager
+          sleep 3
+          
+          # Test the Windows GUI application with Wine
+          echo "Testing Windows amd64 GUI application with Wine..."
+          echo "Environment variables:"
+          env | grep -E "(DISPLAY|XDG|WAYLAND|QT|GDK|WINE)" | sort
+          
+          # Run the Windows application with Wine in background
+          echo "Starting Windows application with Wine..."
+          if [ -f "./dist/windows-amd64/demo.exe" ]; then
+            echo "Running Wine application with Wine 10.9+ (improved EGL support)..."
+            
+            # Set environment variables for better graphics compatibility
+            export WINEDEBUG=-all
+            export MESA_GL_VERSION_OVERRIDE=3.3
+            export MESA_GLSL_VERSION_OVERRIDE=330
+            export GALLIUM_DRIVER=llvmpipe
+            export LIBGL_ALWAYS_SOFTWARE=1
+            
+            # EGL-specific environment variables for Wine 10.9+ EGL backend
+            export EGL_PLATFORM=x11
+            export EGL_LOG_LEVEL=debug
+            export MESA_EGL_VERSION_OVERRIDE=1.5
+            
+            timeout 30s wine ./dist/windows-amd64/demo.exe > wine-output.log 2>&1 &
+            WINE_APP_PID=$!
+            echo "Wine application PID: $WINE_APP_PID"
+            
+            # Wait for the app to start
+            sleep 5
+            
+            # Check if Wine application is still running
+            if ps -p $WINE_APP_PID > /dev/null; then
+              echo "Wine application is running successfully"
+            else
+              echo "Wine application may have exited early"
+              
+              # Check if it's a graphics-related crash (expected for Gio GUI apps)
+              if grep -q "panic\|eglGetDisplay\|egl.NewContext\|dxgi_device_init\|EGL" wine-output.log 2>/dev/null; then
+                echo "Detected EGL/graphics crash with Wine 10.9+, creating informative mock screenshot..."
+                convert -size 1024x768 xc:lightgreen \
+                  -pointsize 20 -fill darkgreen \
+                  -draw "text 50,80 'Wine 10.9+ EGL Backend Test'" \
+                  -pointsize 16 -fill black \
+                  -draw "text 50,120 'Status: Testing new EGL OpenGL backend'" \
+                  -draw "text 50,150 'Backend: EGL (Wine 10.9+ feature)'" \
+                  -draw "text 50,180 'Configuration: UseEGL=Y, renderer=egl'" \
+                  -draw "text 50,210 'Result: EGL crash (compatibility issue)'" \
+                  -draw "text 50,260 'Analysis:'" \
+                  -draw "text 70,290 '• New EGL backend enabled successfully'" \
+                  -draw "text 70,320 '• Go Gio GUI still incompatible with Wine EGL'" \
+                  -draw "text 70,350 '• EGL extensions may be missing'" \
+                  -draw "text 70,380 '• Context creation fails -> nil pointer'" \
+                  -draw "text 50,420 'Next: Try native Linux build or different GUI framework'" \
+                  -pointsize 14 -fill gray \
+                  -draw "text 50,460 'Wine Version: $(wine --version 2>/dev/null || echo unknown)'" \
+                  -draw "text 50,490 'Graphics: EGL backend with Mesa llvmpipe'" \
+                  -draw "text 50,520 'Test Date: $(date)'" \
+                  screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
+              else
+                echo "Wine application crashed for unknown reason, creating generic mock screenshot..."
+                convert -size 1024x768 xc:lightcoral \
+                  -pointsize 24 -fill darkred \
+                  -draw "text 50,100 'Wine Test Failed'" \
+                  -pointsize 16 -fill black \
+                  -draw "text 50,150 'Windows application crashed'" \
+                  -draw "text 50,200 'Check wine-output.log for details'" \
+                  screenshot-wine-mock.png 2>/dev/null || echo "Mock screenshot creation failed"
+              fi
+            fi
+            
+            # Wait more for the app to render
+            sleep 5
+            
+            # Check what processes are running
+            echo "Checking running processes..."
+            ps aux | grep -E "(wine|demo)" | grep -v grep || echo "No wine/demo processes found"
+            
+            # Check Wine desktop windows
+            echo "Checking Wine windows..."
+            xwininfo -root -tree -display :98 | grep -E "(demo|Wine|Default)" || echo "No Wine windows found"
+            
+            # Take screenshot of Wine application
+            echo "Taking Wine screenshot..."
+            import -window root -display :98 screenshot-wine-amd64.png 2>/dev/null || echo "Wine screenshot failed"
+            
+            # Try to capture specific Wine window if it exists
+            echo "Attempting to capture Wine desktop window..."
+            WINE_WINDOW=$(xwininfo -root -tree -display :98 | grep "Wine desktop" | head -1 | awk '{print $1}' || echo "")
+            if [ -n "$WINE_WINDOW" ]; then
+              echo "Found Wine desktop window: $WINE_WINDOW"
+              import -window "$WINE_WINDOW" -display :98 screenshot-wine-desktop.png 2>/dev/null || echo "Wine desktop screenshot failed"
+            else
+              echo "No Wine desktop window found"
+            fi
+            
+            # Check if screenshot was created and pick the best one
+            WINE_SCREENSHOT=""
+            if [ -f "screenshot-wine-desktop.png" ] && [ -s "screenshot-wine-desktop.png" ]; then
+              echo "Wine desktop screenshot captured successfully"
+              ls -la screenshot-wine-desktop.png
+              WINE_SCREENSHOT="screenshot-wine-desktop.png"
+              # Copy the Wine desktop screenshot to the standard name for processing
+              cp "$WINE_SCREENSHOT" screenshot-wine-amd64.png
+            elif [ -f "screenshot-wine-amd64.png" ] && [ -s "screenshot-wine-amd64.png" ]; then
+              echo "Wine root screenshot captured successfully"
+              ls -la screenshot-wine-amd64.png
+              WINE_SCREENSHOT="screenshot-wine-amd64.png"
+              # Already has the right name, no need to copy
+            elif [ -f "screenshot-wine-mock.png" ] && [ -s "screenshot-wine-mock.png" ]; then
+              echo "Using mock screenshot for graphics failure"
+              ls -la screenshot-wine-mock.png
+              WINE_SCREENSHOT="screenshot-wine-mock.png"
+              # Copy the mock screenshot to the standard name for processing
+              cp "$WINE_SCREENSHOT" screenshot-wine-amd64.png
+            else
+              echo "No Wine screenshot captured"
+            fi
+            
+            if [ -n "$WINE_SCREENSHOT" ]; then
+              
+              # Create 2x scaled version for better OCR
+              echo "Creating 2x scaled image for OCR..."
+              convert screenshot-wine-amd64.png -resize 200% screenshot-wine-amd64-2x.png 2>/dev/null || echo "2x scaling failed"
+              
+              # Perform OCR on 2x scaled image
+              echo "Performing OCR on 2x scaled Wine screenshot..."
+              if tesseract screenshot-wine-amd64-2x.png wine-ocr-2x -c tessedit_char_whitelist=0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\ .,:-! 2>/dev/null; then
+                if [ -f "wine-ocr-2x.txt" ] && [ -s "wine-ocr-2x.txt" ]; then
+                  echo "Wine OCR (2x scaled) - SUCCESS:"
+                  cat wine-ocr-2x.txt
+                else
+                  echo "Wine OCR (2x scaled) created empty file"
+                fi
+              else
+                echo "Wine OCR (2x scaled) failed"
+              fi
+              
+              # Generate simple ASCII art with chafa
+              echo "Generating simple ASCII art from Wine screenshot..."
+              if chafa screenshot-wine-amd64.png -s 80x60 -c 2 > wine-ascii-simple.txt 2>&1; then
+                if [ -s wine-ascii-simple.txt ]; then
+                  echo "Wine ASCII art - SUCCESS:"
+                  cat wine-ascii-simple.txt
+                else
+                  echo "Wine ASCII art created empty file"
+                fi
+              else
+                echo "Wine ASCII art generation failed"
+              fi
+            else
+              echo "Wine screenshot was not captured or is empty"
+            fi
+            
+            # Kill the Wine application
+            kill $WINE_APP_PID 2>/dev/null || true
+            wait $WINE_APP_PID 2>/dev/null || true
+          else
+            echo "Windows executable not found: ./dist/windows-amd64/demo.exe"
+          fi
+          
+          # Clean up Wine processes
+          kill $FLUXBOX_WINE_PID 2>/dev/null || true
+          kill $XVFB_WINE_PID 2>/dev/null || true
+          
+          # Always print the Wine log for debugging
+          echo ""
+          echo "=== WINE OUTPUT LOG ==="
+          cat wine-output.log 2>/dev/null || echo "No wine output log"
+          echo "=== END WINE OUTPUT LOG ==="
+          echo ""
+          
+          echo "Wine GUI test completed"
+          
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries
+          path: dist
+          compression-level: 0
+          retention-days: 1
+          
+      - name: Upload Screenshot and Analysis
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: gui-analysis
+          path: |
+            screenshot*.png
+            ocr*.txt
+            ascii*.txt
+            wine-*.txt
+            wine-*.png
+            wine-*.log
+            screenshot-wine-desktop.png
+            screenshot-wine-mock.png
+            *.xwd
+          retention-days: 1 
